@@ -10,6 +10,7 @@
 import logging
 import optparse
 
+import demo
 import ra_layout
 import ra_repeater
 
@@ -29,6 +30,7 @@ if __name__ == '__main__':
 		p.add_option('-P', '--password', default = 'integration', help = 'password for repeater telnet login')
 		p.add_option('-V', '--verbose', action = 'store_true', help = 'enable debug output')
 		p.add_option('-D', '--dbcache', help = 'local path to cached DbXmlInfo.xml to use, instead of retrieving it from repeater')
+		p.add_option('-S', '--startserver', action = 'store_true', help = 'run webserver mode')
 		(options, args) = p.parse_args()
 		
 		# connect and log in
@@ -43,7 +45,12 @@ if __name__ == '__main__':
 		if options.verbose:
 			r.set_verbose(True)
 		r.connect(options.hostname, options.username, options.password)
+
+		# Canned/hardcoded demos for testing
 		#r.enable_monitoring()
 		#r.dump_all_levels()
 		#r.room_to('11', 75)
-		r.dump_all_on()
+		#r.dump_all_on()
+
+		if options.startserver:
+			demo.start(r)

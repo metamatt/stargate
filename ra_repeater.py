@@ -31,6 +31,21 @@ class RaRepeater(object):
 		self.dump_output_levels_cond(outputs, '>', -1)
 		
 	def dump_output_levels_cond(self, outputs, comparison, comparee):
+	 	matches = self.get_output_levels_cond(outputs, comparison, comparee)
+		for m in matches:
+			print m[0] + ' --> ' + m[1]
+
+	def get_outputs_all(self):
+		return self.get_output_levels_cond(self.layout.outputs.values(), '>', -1)
+	
+	def get_outputs_on(self):
+		return self.get_output_levels_cond(self.layout.outputs.values(), '>', 0)
+
+	def get_outputs_off(self):
+		return self.get_output_levels_cond(self.layout.outputs.values(), '=', 0)
+
+	def get_output_levels_cond(self, outputs, comparison, comparee):
+		matches = []
 		for o in outputs:
 			cmd = '?OUTPUT,%s,1' % (o.iid)
 			self.send(cmd)
@@ -42,8 +57,9 @@ class RaRepeater(object):
 			response = self.readline()
 			brightness = float(response.split(',')[-1])
 			if (self.check_cond(brightness, comparison, comparee)):
-				print repr(o) + " --> " + response
+				matches.append((repr(o), response))
 			self.readprompt()
+		return matches
 
 	def check_cond(self, val1, op, val2):
 		if op == '=':
