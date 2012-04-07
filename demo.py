@@ -5,7 +5,8 @@ urls = (
 	'/demo', 'DemoIndex',
 	'/demo/', 'DemoIndex',
 	'/demo/list/(.*)', 'DemoList',
-	'/demo/turn/(.*)', 'DemoSet'
+	'/demo/get/(.*)', 'DemoGetOutput',
+	'/demo/set/(.*)', 'DemoSetOutput'
 )
 repeater = None
 templates = web.template.render('demo/')
@@ -31,16 +32,24 @@ class DemoList:
 		
 		# format each list item, and jam these together with unicode string concat
 		items = unicode()
-		for output in outputs:
-			# each member of the output list is a 2-tuple with name, value
-			item = templates.oneOutput(output[0], output[1])
+		# each member of the output list is a 2-tuple with name, level
+		for (output, level) in outputs:
+			item = templates.oneOutput(output, level)
 			items = items + unicode(item)
 		# then we dump these into the list template, which allows raw html injection
 		return templates.list(items)
 
+class DemoGetOutput:
+	def GET(self, iid):
+		level = repeater.get_output_level(iid)
+		output = repeater.layout.outputs[iid]
+		item = templates.oneOutput(output, level)
+		return templates.list(item)
+	
 class DemoSetOutput:
-	def POST(self, name):
-		return 'Turn ' + name
+	def POST(self, iid):
+		params = web.input()
+		return 'TODO: Set %s to %s' % (iid, params.level)
 
 app = web.application(urls, globals())
 

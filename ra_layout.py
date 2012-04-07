@@ -30,10 +30,16 @@ class RaOutput(RaBase):
 	area_id = None
 	
 	def __init__(self, iid, name, area):
-		name = '%s (in %s)' % (name, area.name)
+		#name = '%s (in %s)' % (name, area.name)
 		super(RaOutput, self).__init__(iid, name)
 		self.area = area
 		area.add_output(self)
+		
+	def get_scoped_name(self):
+		return self.area.name + ' / ' + self.name
+		
+	def get_iid(self):
+		return self.iid
 
 class RaKeypad(RaBase):
 	def __init__(self, iid, name):

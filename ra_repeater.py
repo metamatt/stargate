@@ -35,8 +35,12 @@ class RaRepeater(object):
 		for m in matches:
 			print m[0] + ' --> ' + m[1]
 
+	def get_output_level(self, output_iid):
+		levels = self.get_output_levels_cond([self.layout.outputs[output_iid]])
+		return levels[0][1]
+
 	def get_outputs_all(self):
-		return self.get_output_levels_cond(self.layout.outputs.values(), '>', -1)
+		return self.get_output_levels_cond(self.layout.outputs.values())
 	
 	def get_outputs_on(self):
 		return self.get_output_levels_cond(self.layout.outputs.values(), '>', 0)
@@ -44,7 +48,7 @@ class RaRepeater(object):
 	def get_outputs_off(self):
 		return self.get_output_levels_cond(self.layout.outputs.values(), '=', 0)
 
-	def get_output_levels_cond(self, outputs, comparison, comparee):
+	def get_output_levels_cond(self, outputs, comparison = 'always', comparee = '-1'):
 		matches = []
 		for o in outputs:
 			cmd = '?OUTPUT,%s,1' % (o.iid)
@@ -57,7 +61,7 @@ class RaRepeater(object):
 			response = self.readline()
 			brightness = float(response.split(',')[-1])
 			if (self.check_cond(brightness, comparison, comparee)):
-				matches.append((repr(o), response))
+				matches.append((o, brightness))
 			self.readprompt()
 		return matches
 
@@ -68,6 +72,8 @@ class RaRepeater(object):
 			return val1 < val2
 		if op == '>':
 			return val1 > val2
+		if op == 'always':
+			return True
 		raise 'Unimplemented condition'
 		
 	def outputs_for_area(self, area_iid):
