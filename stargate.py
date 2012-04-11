@@ -29,7 +29,8 @@ if __name__ == '__main__':
 		p.add_option('-U', '--username', default = 'lutron', help = 'username for repeater telnet login')
 		p.add_option('-P', '--password', default = 'integration', help = 'password for repeater telnet login')
 		p.add_option('-V', '--verbose', action = 'store_true', help = 'enable debug output')
-		p.add_option('-D', '--dbcache', help = 'local path to cached DbXmlInfo.xml to use, instead of retrieving it from repeater')
+		p.add_option('-C', '--dbcache', help = 'local path to cached DbXmlInfo.xml to use, instead of retrieving it from repeater')
+		p.add_option('-D', '--debug', action = 'store_true', help = 'enable Flask debugger')
 		p.add_option('-S', '--startserver', action = 'store_true', help = 'run webserver mode')
 		(options, args) = p.parse_args()
 		
@@ -53,4 +54,4 @@ if __name__ == '__main__':
 		#r.dump_all_on()
 
 		if options.startserver:
-			demo.start(r)
+			demo.start(r, options.debug)

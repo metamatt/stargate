@@ -1,0 +1,16 @@
+List:
+<ul>
+	{% for (output, level) in outputs %}
+	<li>
+		<form name="{{ 'output' + output.iid }}" action="{{ '/demo/set/' + output.iid }}" method="post">
+			<a href="{{ '/demo/get/' + output.iid }}">{{ output.get_scoped_name() }}</a>: {{ level }}
+			| <a href="#" onclick="{{ ("document.output%s.elements['level'].value=100; document.output%s.submit(); return false" % (output.iid, output.iid)) | safe }}">On</a>
+			| <a href="#" onclick="{{ ("document.output%s.elements['level'].value=50; document.output%s.submit(); return false" % (output.iid, output.iid)) | safe }}">Half</a>
+			| <a href="#" onclick="{{ ("document.output%s.elements['level'].value=0; document.output%s.submit(); return false" % (output.iid, output.iid)) | safe }}">Off</a>
+			| Level (0-100) <input type="range" name="level" min="0" max="100" value="$level"><input type="submit" value="Set">
+		</form>
+	</li>
+	{% endfor %}
+</ul>
+
+<a href=/demo/>back to top</a>
