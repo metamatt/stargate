@@ -35,7 +35,7 @@ if __name__ == '__main__':
 		(options, args) = p.parse_args()
 		
 		# connect and log in
-		layout = ra_layout.RaLayout()
+		layout = ra_layout.getRaLayout()
 		if options.dbcache:
 			layout.read_cached_db(options.dbcache)
 		else:

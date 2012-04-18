@@ -7,48 +7,49 @@ import httplib
 import logging
 import xml.dom.minidom
 
-
-class RaBase(object):
+class LayoutBase(object):
 	def __init__(self, iid, name):
 		self.iid = iid
 		self.name = name
-		
+
 	def __repr__(self):
 		return '%s %s: %s' % (self.__class__.__name__, self.iid, self.name)
 
-class RaArea(RaBase):
-	outputs = None
-	
-	def __init__(self, iid, name):
-		super(RaArea, self).__init__(iid, name)
-		self.outputs = list()
-		
-	def add_output(self, output):
-		self.outputs.append(output)
-
-class RaOutput(RaBase):
-	area_id = None
-	
-	def __init__(self, iid, name, area):
-		#name = '%s (in %s)' % (name, area.name)
-		super(RaOutput, self).__init__(iid, name)
-		self.area = area
-		area.add_output(self)
-		
-	def get_scoped_name(self):
-		return self.area.name + ' / ' + self.name
-		
 	def get_iid(self):
 		return self.iid
 
-class RaKeypad(RaBase):
+class Area(LayoutBase):
+	outputs = None
+
 	def __init__(self, iid, name):
-		super(RaKeypad, self).__init__(iid, name)
+		super(Area, self).__init__(iid, name)
+		self.outputs = list()
+
+	def add_output(self, output):
+		self.outputs.append(output)
+
+class Output(LayoutBase):
+	area = None
+
+	def __init__(self, iid, name, area):
+		super(Output, self).__init__(iid, name)
+		self.area = area
+		area.add_output(self)
+
+	def get_scoped_name(self):
+		return self.area.name + ' / ' + self.name
+
+class Keypad(LayoutBase):
+	def __init__(self, iid, name):
+		super(Keypad, self).__init__(iid, name)
 
 
 class RaLayout(object):
 	db_dom = None
 	db_xml = None
+	areas = {}
+	outputs = {}
+	keypads = {}
 	
 	def read_cached_db(self, cacheFileName):
 		logging.info('Read DbXmlInfo from local file')
@@ -57,23 +58,23 @@ class RaLayout(object):
 		# figure out when to cache, and when to get the file from the
 		# repeater.
 		cache = open('DbXmlInfo.xml')
-		self.db_xml = cache.read()
+		self._setDbXml(cache.read())
+		
+	def _setDbXml(self, xmlData):
+		self.db_xml = xmlData
 		logging.info('Parse DbXmlInfo')
 		self.db_dom = xml.dom.minidom.parseString(self.db_xml)
+		logging.info('Done parsing DbXmlInfo')
 
 	def get_live_db(self, hostname):
 		logging.info('Read DbXmlInfo from repeater')
 		conn = httplib.HTTPConnection(hostname, 80)
 		conn.request('GET', '/DbXmlInfo.xml')
 		response = conn.getresponse()
-		self.db_xml = response.read()
-		logging.info('Parse DbXmlInfo')
-		self.db_dom = xml.dom.minidom.parseString(self.db_xml)
+		self._setDbXml(response.read())
 
 	def map_db(self):
 		logging.info('Build map from DbXmlInfo')
-		self.areas = {}
-		self.outputs = {}
 		for areaTag in self.db_dom.getElementsByTagName('Area'):
 			area_name = areaTag.attributes['Name'].value
 			if area_name == 'Root Area':
@@ -93,13 +94,18 @@ class RaLayout(object):
 				continue
 			area_iid = areaTag.attributes['IntegrationID'].value
 
-			area = self.areas[area_iid] = RaArea(area_iid, area_name)
+			area = self.areas[area_iid] = Area(area_iid, area_name)
 
 			for outputTag in areaTag.getElementsByTagName('Output'):
 				output_name = outputTag.attributes['Name'].value
 				output_iid = outputTag.attributes['IntegrationID'].value
-				self.outputs[output_iid] = RaOutput(output_iid, output_name, area)
+				self.outputs[output_iid] = Output(output_iid, output_name, area)
 			for deviceTag in areaTag.getElementsByTagName('Device'):
 				# TODO: extract info about keypads
 				pass
 		logging.info('Done building DbXmlInfo map')
+
+theLayout = RaLayout()
+
+def getRaLayout():
+	return theLayout
