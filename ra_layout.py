@@ -2,12 +2,17 @@
 # software, and available from the repeater's web server as DbXmlInfo.xml),
 # and provides a high-level interface for working with its information in
 # a structured way: areas, loads, and keypads.
+#
+# The idea here is that RaLayout and friends model things very close to
+# the way Lutron's XML file does. Then RaHouse can reinterpret and model
+# things differently if it so chooses.
 
 import httplib
 import logging
 import xml.dom.minidom
 
 class LayoutBase(object):
+	# Everything in a RaLayout has an iid and a name.
 	def __init__(self, iid, name):
 		self.iid = iid
 		self.name = name
@@ -19,6 +24,9 @@ class LayoutBase(object):
 		return self.iid
 
 class Area(LayoutBase):
+	# An Area also has a list of outputs.
+	# XXX and keypads, shade groups, any other components?
+
 	outputs = None
 
 	def __init__(self, iid, name):
@@ -32,17 +40,22 @@ class Area(LayoutBase):
 		return self.outputs
 
 class Output(LayoutBase):
+	# An Output has a type and lives in an area.
+	
 	area = None
+	outputType = None
 
-	def __init__(self, iid, name, area):
+	def __init__(self, iid, name, outputType, area):
 		super(Output, self).__init__(iid, name)
 		self.area = area
+		self.outputType = outputType
 		area.add_output(self)
 
 	def get_scoped_name(self):
 		return self.area.name + ' / ' + self.name
 
 class Keypad(LayoutBase):
+	# Keypad: XXX placeholder
 	def __init__(self, iid, name):
 		super(Keypad, self).__init__(iid, name)
 
@@ -102,7 +115,8 @@ class RaLayout(object):
 			for outputTag in areaTag.getElementsByTagName('Output'):
 				output_name = outputTag.attributes['Name'].value
 				output_iid = int(outputTag.attributes['IntegrationID'].value)
-				self.outputs[output_iid] = Output(output_iid, output_name, area)
+				output_type = outputTag.attributes['OutputType'].value
+				self.outputs[output_iid] = Output(output_iid, output_name, output_type, area)
 			for deviceTag in areaTag.getElementsByTagName('Device'):
 				# TODO: extract info about keypads
 				pass

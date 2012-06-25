@@ -114,7 +114,7 @@ class RaRepeater(object):
 		if match:
 			output = int(match.group(1))
 			level = float(match.group(2))
-			print "match %s -> %d:%g" % (match.group(), output, level)
+			print "match %s -> device %d set level %g" % (match.group(), output, level)
 			self.cache.setLevel(output, level)
 
 	def startListenThread(self):

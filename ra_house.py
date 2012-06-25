@@ -2,8 +2,26 @@
 
 
 
+class DeviceType(object):
+	DIMMED_LOAD, SWITCHED_LOAD, SHADE, CONTACT_CLOSURE, OTHER = range(5)
+	lutron_name_map = {
+		"INC": DIMMED_LOAD,
+		"NON_DIM": SWITCHED_LOAD,
+		"SYSTEM_SHADE": SHADE,
+		"CCO_PULSED": CONTACT_CLOSURE,
+	}
+	
+	@classmethod
+	def from_lutron_name(cls, name):
+		try:
+			return cls.lutron_name_map[name]
+		except:
+			return OTHER
+
+
 class Device(object):
 	# individual RadioRa device -- switch(load), shade, remote, keypad, etc
+	# XXX the split between this and OutputDevice is arbitrary right now, I'm still figuring out where it lies
 	def __init__(self, house, iid, zone):
 		self.house = house
 		self.iid = iid
@@ -28,6 +46,7 @@ class OutputDevice(Device):
 	def __init__(self, house, layoutOutput, zone):
 		super(OutputDevice, self).__init__(house, layoutOutput.iid, zone)
 		self.name = layoutOutput.get_scoped_name()
+		self.type = DeviceType.from_lutron_name(layoutOutput.outputType)
 
 
 class DeviceZone(object):
