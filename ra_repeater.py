@@ -22,7 +22,7 @@ ra_prompts = set(['login: ', 'password: ', 'GNET> '])
 CRLF = '\r\n'
 
 class OutputCache(object):
-	# Super cheap temporary thing for now; this will be replaced by something better
+	# Low-level cache of last seen level for each device (output, button, led)
 	outputLevels = None
 	repeater = None
 	
@@ -30,108 +30,46 @@ class OutputCache(object):
 		self.outputLevels = {}
 		self.repeater = repeater
 	
-	def setLevel(self, id, value):
-		id = int(id) # XXX
-		value = float(value) # XXX
-		self.outputLevels[id] = value
+	def setLevel(self, iid, level):
+		# should be called only by RaRepeater.repeaterReply()
+		self.outputLevels[iid] = level
 	
-	def getLevel(self, id):
-		id = int(id) # XXX
-		return self.outputLevels[id]
+	def getLevel(self, iid):
+		iid = int(iid) # XXX callers should use correct type
+		return self.outputLevels[iid]
 		
-	def refresh(self, id):
-		self.repeater.repeaterCommand('?OUTPUT,%d,1' % int(id))
+	def refresh(self, iid):
+		iid = int(iid) # XXX callers should use correct type
+		# async, request refresh
+		self.repeater.repeaterCommand('?OUTPUT,%d,1' % iid)
 	
 	def refreshAll(self):
-		# async, request refresh
-		for id in self.repeater.layout.outputs:
-			self.refresh(id)
-		# XXX need way to tell it actually happened
+		for iid in self.repeater.knownOutputs:
+			self.refresh(iid)
+		# XXX that was async; should we provide sync version?
 
 class RaRepeater(object):
-	layout = None
 	state = None
 	cache = None
+	knownOutputs = None
 	
-	def __init__(self, layout):
+	def __init__(self):
 		self.verbose = False
-		self.layout = layout
 	
 	def set_verbose(self, verbosity):
 		self.verbose = verbosity
-		
-	def dump_all_levels(self):
-		self.dump_output_levels(self.layout.outputs.values())
-		
-	def dump_room_levels(self, area_iid):
-		self.dump_output_levels(self.outputs_for_area(area_iid))
-		
-	def dump_all_on(self):
-		self.dump_output_levels_cond(self.layout.outputs.values(), '>', 0)
-		
-	def dump_output_levels(self, outputs):
-		self.dump_output_levels_cond(outputs, '>', -1)
-		
-	def dump_output_levels_cond(self, outputs, comparison, comparee):
-	 	matches = self.get_output_levels_cond(outputs, comparison, comparee)
-		for m in matches:
-			print m[0] + ' --> ' + m[1]
-
+	
+	def set_outputs_to_cache(self, iids):
+		self.cache = OutputCache(self)
+		self.knownOutputs = iids
+		self.cache.refreshAll()
+	
 	def get_output_level(self, output_iid):
-		levels = self.get_output_levels_cond([self.layout.outputs[output_iid]])
+		return self.cache.getLevel(output_iid)
 		return levels[0][1]
 
-	def get_outputs_all(self):
-		return self.get_output_levels_cond(self.layout.outputs.values())
-	
-	def get_outputs_on(self):
-		return self.get_output_levels_cond(self.layout.outputs.values(), '>', 0)
-
-	def get_outputs_off(self):
-		return self.get_output_levels_cond(self.layout.outputs.values(), '=', 0)
-
-	def get_output_levels_cond(self, outputs, comparison = 'always', comparee = '-1'):
-		matches = []
-		for o in outputs:
-			level = self.cache.getLevel(o.iid)
-			if (self.check_cond(level, comparison, comparee)):
-				matches.append((o, level))
-		return matches
-
-	def check_cond(self, val1, op, val2):
-		if op == '=':
-			return val1 == val2
-		if op == '<':
-			return val1 < val2
-		if op == '>':
-			return val1 > val2
-		if op == 'always':
-			return True
-		raise 'Unimplemented condition'
-		
-	def outputs_for_area(self, area_iid):
-		#return [self.outputs[oid] for oid in self.layout.areas[area_iid].output_ids]
-		return self.layout.areas[area_iid].outputs
-		
-	def all_on(self):
-		self.all_to(100)
-
-	def all_off(self):
-		self.all_to(0)
-		
-	def all_to(self, level):
-		pass # XXX write and test this when people aren't asleep!
-
-	def room_on(self, area_iid):
-		self.room_to(area_iid, 100)
-
-	def room_off(self, area_iid):
-		self.room_to(area_iid, 0)
-		
-	def room_to(self, area_iid, level):
-		for output in self.outputs_for_area(area_iid):
-			print "should set %s to %s" % (repr(output), str(level))
-		# XXX finish and test this when people aren't asleep!
+	def set_output_level(self, output_iid, level):
+		self.repeaterCommand('#OUTPUT,%d,1,%g' % (output_iid, level))
 
 	def connect(self, hostname, username, password):
 		self.hostname = hostname
@@ -147,9 +85,6 @@ class RaRepeater(object):
 		self.repeaterCommand(password)
 		self.waitForState(STATE_READY)
 		self.enable_monitoring()
-
-		self.cache = OutputCache(self)
-		self.cache.refreshAll()
 		
 	def enable_monitoring(self):
 		self.repeaterCommand('#MONITORING,255,1')
@@ -171,6 +106,9 @@ class RaRepeater(object):
 			self._setState(STATE_WANT_PASSWORD)
 
 		# TODO: more substantive processing of real commands
+		# - should handle output, led, and button
+		# - should announce this happened for historical logging
+		# - should cache value for future gets (that's all this does now)
 		pattern = re.compile('~OUTPUT,(\d+),1,(\d+.\d+)')
 		match = pattern.search(line) # XXX: match instead of search, once I figure out the \rGNET issue
 		if match:
@@ -182,6 +120,7 @@ class RaRepeater(object):
 	def startListenThread(self):
 		class RepeaterListener(threading.Thread):
 			repeater = None
+			daemon = True
 
 			def __init__(self, repeater):
 				super(RepeaterListener, self).__init__()

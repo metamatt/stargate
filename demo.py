@@ -1,7 +1,7 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, redirect, url_for
 
 app = Flask(__name__)
-repeater = None
+house = None
 
 @app.route('/')
 def root_index():
@@ -14,32 +14,37 @@ def demo_index():
 @app.route('/demo/list/<criteria>')
 def demo_list(criteria):
 	if criteria == 'on':
-		outputs = repeater.get_outputs_on()
+		outputs = house.get_on_devices()
 	elif criteria == 'off':
-		outputs = repeater.get_outputs_off()
+		outputs = house.get_off_devices()
 	elif criteria == 'all':
-		outputs = repeater.get_outputs_all()
+		outputs = house.get_all_devices()
 	else:
 		raise Exception('bad request')
 	
 	return render_template('outputList.html', outputs = outputs)
 
-@app.route('/demo/get/<iid>')
+@app.route('/demo/get/<int:iid>')
 def demo_get_output(iid):
-	level = repeater.get_output_level(iid)
-	output = repeater.layout.outputs[iid]
-	return render_template('outputList.html', outputs = [(output, level)])
+	output = house.get_device_by_iid(iid)
+	return render_template('outputList.html', outputs = [output])
 
 @app.route('/demo/set/<int:iid>', methods = ['POST'])
 def demo_set_output(iid):
 	params = request.form
-	return 'TODO: Set %s to %s' % (iid, params['level'])
+	output = house.get_device_by_iid(iid)
+	level = float(params['level'])
+	#return 'TODO: Set %s to %s' % (iid, level)
+	output.set_level(level)
+	# XXX should make this respond to async operation when it completes; for now just wait a bit
+	import time
+	time.sleep(0.3)
+	return redirect(url_for('demo_get_output', iid = iid))
 
-
-def start(withRepeater, debug = False):
+def start(theHouse, debug = False):
 	# save repeater for handler classes to use
-	global repeater
-	repeater = withRepeater
+	global house
+	house = theHouse
 
 	# start webserver
 	if debug:

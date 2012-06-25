@@ -11,6 +11,7 @@ import logging
 import optparse
 
 import demo
+import ra_house
 import ra_layout
 import ra_repeater
 
@@ -35,17 +36,21 @@ if __name__ == '__main__':
 		(options, args) = p.parse_args()
 		
 		# connect and log in
-		layout = ra_layout.getRaLayout()
+		layout = ra_layout.RaLayout()
 		if options.dbcache:
 			layout.read_cached_db(options.dbcache)
 		else:
 			layout.get_live_db(options.hostname)
 		layout.map_db()
 
-		r = ra_repeater.RaRepeater(layout)
+		repeater = ra_repeater.RaRepeater()
 		if options.verbose:
-			r.set_verbose(True)
-		r.connect(options.hostname, options.username, options.password)
+			repeater.set_verbose(True)
+		repeater.connect(options.hostname, options.username, options.password)
+		
+		house = ra_house.House(repeater, layout)
+		if options.verbose:
+			house.set_verbose(True)
 
 		# Canned/hardcoded demos for testing
 		#r.enable_monitoring()
@@ -54,4 +59,4 @@ if __name__ == '__main__':
 		#r.dump_all_on()
 
 		if options.startserver:
-			demo.start(r, options.debug)
+			demo.start(house, options.debug)

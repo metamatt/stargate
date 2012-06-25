@@ -27,6 +27,9 @@ class Area(LayoutBase):
 
 	def add_output(self, output):
 		self.outputs.append(output)
+		
+	def getOutputs(self):
+		return self.outputs
 
 class Output(LayoutBase):
 	area = None
@@ -47,8 +50,8 @@ class Keypad(LayoutBase):
 class RaLayout(object):
 	db_dom = None
 	db_xml = None
-	areas = {}
-	outputs = {}
+	areas = {} # map from iid (int) to object (Area)
+	outputs = {} # map from iid (int) to object (Output)
 	keypads = {}
 	
 	def read_cached_db(self, cacheFileName):
@@ -92,20 +95,24 @@ class RaLayout(object):
 				# areas contain areas, but not by flattening areas->outputs entirely
 				# the way the DOM getElementsByTagName does.
 				continue
-			area_iid = areaTag.attributes['IntegrationID'].value
+			area_iid = int(areaTag.attributes['IntegrationID'].value)
 
 			area = self.areas[area_iid] = Area(area_iid, area_name)
 
 			for outputTag in areaTag.getElementsByTagName('Output'):
 				output_name = outputTag.attributes['Name'].value
-				output_iid = outputTag.attributes['IntegrationID'].value
+				output_iid = int(outputTag.attributes['IntegrationID'].value)
 				self.outputs[output_iid] = Output(output_iid, output_name, area)
 			for deviceTag in areaTag.getElementsByTagName('Device'):
 				# TODO: extract info about keypads
 				pass
 		logging.info('Done building DbXmlInfo map')
 
-theLayout = RaLayout()
-
-def getRaLayout():
-	return theLayout
+	def get_all_output_ids(self):
+		return self.outputs.keys()
+	
+	def getOutputs(self):
+		return self.outputs.values()
+	
+	def getAreas(self):
+		return self.areas.values()
