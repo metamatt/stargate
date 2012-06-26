@@ -11,17 +11,17 @@ def root_index():
 def demo_index():
 	return render_template('index.html')
 
-@app.route('/demo/list/<criteria>')
-def demo_list(criteria):
+@app.route('/output/list/<criteria>')
+def list_outputs(criteria):
 	outputs = house.get_devices_in_state(criteria)
 	return render_template('outputList.html', outputs = outputs)
 
-@app.route('/demo/get/<int:iid>')
+@app.route('/output/get/<int:iid>')
 def demo_get_output(iid):
 	output = house.get_device_by_iid(iid)
 	return render_template('outputList.html', outputs = [output])
 
-@app.route('/demo/set/<int:iid>', methods = ['POST'])
+@app.route('/output/set/<int:iid>', methods = ['POST'])
 def demo_set_output(iid):
 	params = request.form
 	output = house.get_device_by_iid(iid)
@@ -32,6 +32,11 @@ def demo_set_output(iid):
 	import time
 	time.sleep(0.3)
 	return redirect(url_for('demo_get_output', iid = iid))
+
+@app.route('/area/list/<criteria>')
+def list_areas(criteria):
+	areas = house.get_areas_with_devices(criteria)
+	return render_template('areaList.html', areas = areas)
 
 def start(theHouse, debug = False):
 	# save repeater for handler classes to use

@@ -17,7 +17,8 @@ class Device(object):
 	
 	def set_level(self, level):
 		self.house._set_output_level(self.iid, level)
-		
+	
+	# queries
 	def is_on(self):
 		return False # subclass must override
 	
@@ -30,7 +31,16 @@ class Device(object):
 	def is_closed(self):
 		return False # subclass must override
 	
-	def is_any(self):
+	def is_light(self):
+		return False # subclass must override
+
+	def is_shade(self):
+		return False # subclass must override
+
+	def is_contactclosure(self):
+		return False # subclass must override
+
+	def is_all(self):
 		return True
 
 		
@@ -43,6 +53,9 @@ class OutputDevice(Device):
 class SwitchedOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(SwitchedOutput, self).__init__(house, zone, output)
+
+	def is_light(self):
+		return True
 
 	def is_on(self):
 		return self.get_level() > 0
@@ -60,6 +73,9 @@ class ShadeOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ShadeOutput, self).__init__(house, zone, output)
 
+	def is_shade(self):
+		return True
+
 	# XXX should we define "partially open", "fully open", "partially closed", "fully closed"?
 	# and a half-open shade is both partially open and closed? Otherwise, what is it?
 	def is_closed(self):
@@ -72,6 +88,9 @@ class ShadeOutput(OutputDevice):
 class ContactClosureOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ContactClosureOutput, self).__init__(house, zone, output)
+	
+	def is_contactclosure(self):
+		return True
 
 
 def create_device_for_output(house, zone, output):
@@ -102,38 +121,66 @@ class DeviceZone(object):
 			self.name = area.name
 			self.members = [create_device_for_output(house, self, output) for output in area.get_outputs()]
 	
-	# interface to get/set output levels (zone scope)
-	def get_on_devices(self):
-		return self.get_devices_matching(Device.is_on)
-	
-	def get_off_devices(self):
-		return self.get_devices_matching(Device.is_off)
-		
-	def get_all_devices(self):
+	def _children_of_type(self, cls):
 		# build flat list of children
 		devs = []
 		for m in self.members:
-			if isinstance(m, Device):
+			if isinstance(m, cls):
 				devs.append(m)
-			else:
-				devs.extend(m.get_all_devices())
+			if isinstance(m, DeviceZone):
+				devs.extend(m._children_of_type(cls))
 		return devs
+
+	# queries
+	# XXX metaprogram this! has_on, etc should work too...
+	def has_all(self):
+		return True
 	
+	def has_light(self):
+		return any(dev.is_light() for dev in self.get_all_devices())
+		
+	def has_shade(self):
+		return any(dev.is_shade() for dev in self.get_all_devices())
+		
+	def has_contactclosure(self):
+		return any(dev.is_contactclosure() for dev in self.get_all_devices())
+
+	# interface to enumerate contained devices and areas
+	def get_all_devices(self):
+		return self._children_of_type(Device)
+
 	def get_devices_matching(self, filterP):
-		return [dev for dev in self.get_all_devices() if filterP(dev)]
+		return filter(filterP, self.get_all_devices())
 		
 	def get_devices_in_state(self, state):
 		def inStateP(state):
 			def device_is_in_state(dev, state):
 				state_pred = 'is_' + state
 				try:
-					print 'call %s on %s' % (state_pred, dev)
 					return getattr(dev, state_pred)()
 				except Exception as ex:
 					print ex
 					return False
 			return lambda dev: device_is_in_state(dev, state)
 		return self.get_devices_matching(inStateP(state))
+
+	def get_all_areas(self):
+		return self._children_of_type(DeviceZone)
+
+	def get_areas_matching(self, filterP):
+		return filter(filterP, self.get_all_areas())
+
+	def get_areas_with_devices(self, childtype):
+		def hasChildP(childtype):
+			def area_has_child(area, childtype):
+				type_pred = 'has_' + childtype
+				try:
+					return getattr(area, type_pred)()
+				except Exception as ex:
+					print ex
+					return False
+			return lambda area: area_has_child(area, childtype)
+		return self.get_areas_matching(hasChildP(childtype))
 
 
 class House(DeviceZone):
