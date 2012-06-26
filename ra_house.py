@@ -38,7 +38,7 @@ Device._add_generated_methods()
 class OutputDevice(Device):
 	def __init__(self, house, zone, output):
 		super(OutputDevice, self).__init__(house, zone, output.iid)
-		self.name = output.get_scoped_name()
+		self.name = output.name
 
 
 class SwitchedOutput(OutputDevice):

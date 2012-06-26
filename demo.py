@@ -15,7 +15,7 @@ def demo_index():
 @app.route('/output/list/<criteria>')
 def list_outputs(criteria):
 	outputs = house.get_devices_in_state(criteria)
-	return render_template('outputList.html', outputs = outputs)
+	return render_template('outputList.html', outputs = outputs, filter = criteria)
 
 @app.route('/output/get/<int:iid>')
 def demo_get_output(iid):
@@ -37,7 +37,7 @@ def demo_set_output(iid):
 @app.route('/area/list/<criteria>')
 def list_areas(criteria):
 	areas = house.get_areas_with_devices(criteria)
-	return render_template('areaList.html', areas = areas)
+	return render_template('areaList.html', areas = areas, filter = criteria)
 
 @app.route('/area/<int:iid>')
 def enumerate_area(iid):

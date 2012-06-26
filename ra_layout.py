@@ -51,9 +51,6 @@ class Output(LayoutBase):
 		self.outputType = outputType
 		area.add_output(self)
 
-	def get_scoped_name(self):
-		return self.area.name + ' / ' + self.name
-		
 	def get_type(self):
 		return self.outputType
 
