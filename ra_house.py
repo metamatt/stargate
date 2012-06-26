@@ -21,17 +21,18 @@ class Device(object):
 	# queries
 	QUERIES = [ 'on', 'off', 'open', 'closed', 'light', 'shade', 'contactclosure', 'all' ]
 
-	def is_dummy(self):
-		return False
-
 	def is_all(self):
 		return True
+		
+	@classmethod
+	def _add_generated_methods(cls):
+		# Add the rest of the base-class fallthrough query handlers
+		for query_name in Device.QUERIES:
+			method_name = 'is_' + query_name
+			if not hasattr(cls, method_name):
+				setattr(cls, method_name, lambda dev: False)
 
-# Add the rest of the base-class fallthrough query handles to the Device class
-for query_name in Device.QUERIES:
-	method_name = 'is_' + query_name
-	if not hasattr(Device, method_name):
-		setattr(Device, method_name, Device.is_dummy)
+Device._add_generated_methods()
 
 		
 class OutputDevice(Device):
@@ -126,6 +127,13 @@ class DeviceZone(object):
 	def has_general(self, query_name):
 		return any(getattr(dev, 'is_' + query_name)() for dev in self.get_all_devices())
 	# After this class is defined, we will autogenerate a bunch of specializations of this
+	# by invoking the following:
+	@classmethod
+	def _add_generated_methods(cls):
+		# Automatically wrap the "is" device queries as "has" zone queries
+		for query_name in Device.QUERIES:
+			# Note lambda-takes-extra-arg-with-default hack to capture current *value* of query_name
+			setattr(cls, 'has_' + query_name, lambda self, query_name = query_name: DeviceZone.has_general(self, query_name))
 
 	# interface to enumerate contained devices and areas
 	def get_all_devices(self):
@@ -164,10 +172,7 @@ class DeviceZone(object):
 			return lambda area: area_has_child(area, childtype)
 		return self.get_areas_matching(hasChildP(childtype))
 
-# Automatically wrap the "is" device queries as "has" zone queries
-for query_name in Device.QUERIES:
-	# Note lambda-takes-extra-arg-with-default hack to capture current *value* of query_name
-	setattr(DeviceZone, 'has_' + query_name, lambda self, query_name = query_name: DeviceZone.has_general(self, query_name))
+DeviceZone._add_generated_methods()
 
 
 class House(DeviceZone):
