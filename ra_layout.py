@@ -36,7 +36,7 @@ class Area(LayoutBase):
 	def add_output(self, output):
 		self.outputs.append(output)
 		
-	def getOutputs(self):
+	def get_outputs(self):
 		return self.outputs
 
 class Output(LayoutBase):
@@ -53,6 +53,9 @@ class Output(LayoutBase):
 
 	def get_scoped_name(self):
 		return self.area.name + ' / ' + self.name
+		
+	def get_type(self):
+		return self.outputType
 
 class Keypad(LayoutBase):
 	# Keypad: XXX placeholder
@@ -122,11 +125,11 @@ class RaLayout(object):
 				pass
 		logging.info('Done building DbXmlInfo map')
 
-	def get_all_output_ids(self):
+	def get_output_ids(self):
 		return self.outputs.keys()
 	
-	def getOutputs(self):
+	def get_outputs(self):
 		return self.outputs.values()
 	
-	def getAreas(self):
+	def get_areas(self):
 		return self.areas.values()

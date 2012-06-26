@@ -13,15 +13,7 @@ def demo_index():
 
 @app.route('/demo/list/<criteria>')
 def demo_list(criteria):
-	if criteria == 'on':
-		outputs = house.get_on_devices()
-	elif criteria == 'off':
-		outputs = house.get_off_devices()
-	elif criteria == 'all':
-		outputs = house.get_all_devices()
-	else:
-		raise Exception('bad request')
-	
+	outputs = house.get_devices_in_state(criteria)
 	return render_template('outputList.html', outputs = outputs)
 
 @app.route('/demo/get/<int:iid>')
