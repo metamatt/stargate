@@ -1,12 +1,16 @@
 List:
 <ul>
 	{% for output in outputs %}
+	{% set outputN = 'output%d' % output.iid %}
+	{% macro emit_set_to_level_link(iid, level, name) -%}
+		<a href="#" onclick="document.{{ outputN }}.elements['level'].value={{ level }}; document.{{ outputN }}.submit(); return false">{{ name }}</a>
+	{%- endmacro %}
 	<li>
-		<form name="{{ 'output%d' % output.iid }}" action="{{ '/demo/set/%d' % output.iid }}" method="post">
+		<form name="{{ outputN }}" action="{{ '/demo/set/%d' % output.iid }}" method="post">
 			<a href="{{ '/demo/get/%d' % output.iid }}">{{ output.name }}</a>: {{ output.get_level() }}
-			| <a href="#" onclick="{{ ("document.output%d.elements['level'].value=100; document.output%d.submit(); return false" % (output.iid, output.iid)) | safe }}">On</a>
-			| <a href="#" onclick="{{ ("document.output%d.elements['level'].value=50; document.output%d.submit(); return false" % (output.iid, output.iid)) | safe }}">Half</a>
-			| <a href="#" onclick="{{ ("document.output%d.elements['level'].value=0; document.output%d.submit(); return false" % (output.iid, output.iid)) | safe }}">Off</a>
+			| {{ emit_set_to_level_link(output.iid, 100, 'On') }}
+			| {{ emit_set_to_level_link(output.iid, 50, 'Half') }}
+			| {{ emit_set_to_level_link(output.iid, 0, 'Off') }}
 			| Level (0-100) <input type="range" name="level" min="0" max="100" value="{{ output.get_level() }}"><input type="submit" value="Set">
 		</form>
 	</li>

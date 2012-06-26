@@ -1,10 +1,9 @@
 <p>
 	List outputs:
-	<a href=/demo/list/on>on</a>
-	<a href=/demo/list/off>off</a>
-	<a href=/demo/list/open>open</a>
-	<a href=/demo/list/closed>closed</a>
-	<a href=/demo/list/any>any</a>
+	
+{% for status in [ 'on', 'off', 'open', 'closed', 'any'] %}
+	<a href=/demo/list/{{ status }}>{{ status }}</a>
+{% endfor %}
 </p>
 
 <p>
