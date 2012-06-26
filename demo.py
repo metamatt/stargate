@@ -39,6 +39,11 @@ def list_areas(criteria):
 	areas = house.get_areas_with_devices(criteria)
 	return render_template('areaList.html', areas = areas)
 
+@app.route('/area/<int:iid>')
+def enumerate_area(iid):
+	outputs = house.get_devicezone_by_iid(iid).get_all_devices()
+	return render_template('outputList.html', outputs = outputs)
+
 @app.context_processor
 def inject_device_queries():
 	return dict(device_queries = Device.QUERIES)

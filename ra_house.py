@@ -110,6 +110,7 @@ class DeviceZone(object):
 			self.iid = area.iid
 			self.name = area.name
 			self.members = [create_device_for_output(house, self, output) for output in area.get_outputs()]
+			house._register_zone(self.iid, self)
 	
 	def _children_of_type(self, cls):
 		# build flat list of children
@@ -175,6 +176,7 @@ class House(DeviceZone):
 	def __init__(self, repeater, layout):
 		super(House, self).__init__(self, None)
 		self.devices = {}
+		self.zones = {}
 		self.verbose = False
 		self.repeater = repeater
 		self.layout = layout
@@ -193,10 +195,16 @@ class House(DeviceZone):
 
 	def get_device_by_iid(self, iid):
 		return self.devices[iid]
+		
+	def get_devicezone_by_iid(self, iid):
+		return self.zones[iid]
 
 	# private interface for owned objects to talk to repeater
 	def _register_device(self, iid, device):
 		self.devices[iid] = device
+		
+	def _register_zone(self, iid, zone):
+		self.zones[iid] = zone
 
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)

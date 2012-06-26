@@ -1,8 +1,8 @@
-List:
+Areas:
 <ul>
 	{% for area in areas %}
 	<li>
-		{{ area.name }}
+		<a href='/area/{{ area.iid }}'>{{ area.name }}</a>
 	</li>
 	{% endfor %}
 </ul>
