@@ -1,4 +1,7 @@
-{{ areas|length }} areas matching filter '{{ filter }}':
+{{ areas|length }} areas
+{% if filters|length %}
+matching filter '{{ filters|join(',') }}'
+{% endif %}
 <ul>
 	{% for area in areas %}
 	<li>

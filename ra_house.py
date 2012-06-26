@@ -18,17 +18,17 @@ class Device(object):
 	def set_level(self, level):
 		self.house._set_output_level(self.iid, level)
 	
-	# queries
-	QUERIES = [ 'on', 'off', 'open', 'closed', 'light', 'shade', 'contactclosure', 'all' ]
+	# filters
+	FILTERS = [ 'on', 'off', 'open', 'closed', 'light', 'shade', 'contactclosure', 'all' ]
 
 	def is_all(self):
 		return True
 		
 	@classmethod
 	def _add_generated_methods(cls):
-		# Add the rest of the base-class fallthrough query handlers
-		for query_name in Device.QUERIES:
-			method_name = 'is_' + query_name
+		# Add the rest of the base-class fallthrough filter handlers
+		for filter_name in Device.FILTERS:
+			method_name = 'is_' + filter_name
 			if not hasattr(cls, method_name):
 				setattr(cls, method_name, lambda dev: False)
 
@@ -123,54 +123,50 @@ class DeviceZone(object):
 				devs.extend(m._children_of_type(cls))
 		return devs
 
-	# queries
-	def has_general(self, query_name):
-		return any(getattr(dev, 'is_' + query_name)() for dev in self.get_all_devices())
+	# filters
+	def has_general(self, filter_name):
+		return any(getattr(dev, 'is_' + filter_name)() for dev in self.get_all_devices())
 	# After this class is defined, we will autogenerate a bunch of specializations of this
 	# by invoking the following:
 	@classmethod
 	def _add_generated_methods(cls):
-		# Automatically wrap the "is" device queries as "has" zone queries
-		for query_name in Device.QUERIES:
-			# Note lambda-takes-extra-arg-with-default hack to capture current *value* of query_name
-			setattr(cls, 'has_' + query_name, lambda self, query_name = query_name: DeviceZone.has_general(self, query_name))
+		# Automatically wrap the "is" device filters as "has" zone filters
+		for filter_name in Device.FILTERS:
+			# Note lambda-takes-extra-arg-with-default hack to capture current *value* of filter_name
+			setattr(cls, 'has_' + filter_name, lambda self, filter_name = filter_name: DeviceZone.has_general(self, filter_name))
 
 	# interface to enumerate contained devices and areas
 	def get_all_devices(self):
 		return self._children_of_type(Device)
 
-	def get_devices_matching(self, filterP):
-		return filter(filterP, self.get_all_devices())
-		
-	def get_devices_in_state(self, state):
+	def get_devices_filtered_by(self, filters):
 		def inStateP(state):
 			def device_is_in_state(dev, state):
 				state_pred = 'is_' + state
-				try:
+				if hasattr(dev, state_pred):
 					return getattr(dev, state_pred)()
-				except Exception as ex:
-					print ex
-					return False
+				return False
 			return lambda dev: device_is_in_state(dev, state)
-		return self.get_devices_matching(inStateP(state))
+		devs = self.get_all_devices()
+		for state in filters:
+			devs = filter(inStateP(state), devs)
+		return devs
 
 	def get_all_areas(self):
 		return self._children_of_type(DeviceZone)
 
-	def get_areas_matching(self, filterP):
-		return filter(filterP, self.get_all_areas())
-
-	def get_areas_with_devices(self, childtype):
+	def get_areas_filtered_by(self, filters):
 		def hasChildP(childtype):
 			def area_has_child(area, childtype):
 				type_pred = 'has_' + childtype
-				try:
+				if hasattr(area, type_pred):
 					return getattr(area, type_pred)()
-				except Exception as ex:
-					print ex
-					return False
+				return False
 			return lambda area: area_has_child(area, childtype)
-		return self.get_areas_matching(hasChildP(childtype))
+		areas = self.get_all_areas()
+		for state in filters:
+			areas = filter(hasChildP(state), areas)
+		return areas
 
 DeviceZone._add_generated_methods()
 

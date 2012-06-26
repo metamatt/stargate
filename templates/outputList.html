@@ -1,4 +1,10 @@
-{{ outputs|length }} devices matching filter '{{ filter }}':
+{{ outputs|length }} devices
+{% if area %}
+in area '{{ area.name }}'
+{% endif %}
+{% if filters|length %}
+matching filter '{{ filters|join(',') }}'
+{% endif %}
 <ul>
 	{% for output_group in outputs | groupby('zone') %}
 	{% for output in output_group.list %}

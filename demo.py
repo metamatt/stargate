@@ -12,10 +12,11 @@ def root_index():
 def demo_index():
 	return render_template('index.html')
 
-@app.route('/output/list/<criteria>')
-def list_outputs(criteria):
-	outputs = house.get_devices_in_state(criteria)
-	return render_template('outputList.html', outputs = outputs, filter = criteria)
+@app.route('/output/list/<filterlist>')
+def list_outputs(filterlist):
+	filters = filterlist.split(',')
+	outputs = house.get_devices_filtered_by(filters)
+	return render_template('outputList.html', outputs = outputs, filters = filters)
 
 @app.route('/output/get/<int:iid>')
 def demo_get_output(iid):
@@ -34,19 +35,21 @@ def demo_set_output(iid):
 	time.sleep(0.3)
 	return redirect(url_for('demo_get_output', iid = iid))
 
-@app.route('/area/list/<criteria>')
-def list_areas(criteria):
-	areas = house.get_areas_with_devices(criteria)
-	return render_template('areaList.html', areas = areas, filter = criteria)
+@app.route('/area/list/<filterlist>')
+def list_areas(filterlist):
+	filters = filterlist.split(',')
+	areas = house.get_areas_filtered_by(filters)
+	return render_template('areaList.html', areas = areas, filters = filters)
 
 @app.route('/area/<int:iid>')
 def enumerate_area(iid):
-	outputs = house.get_devicezone_by_iid(iid).get_all_devices()
-	return render_template('outputList.html', outputs = outputs)
+	area = house.get_devicezone_by_iid(iid)
+	outputs = area.get_all_devices()
+	return render_template('outputList.html', area = area, outputs = outputs)
 
 @app.context_processor
-def inject_device_queries():
-	return dict(device_queries = Device.QUERIES)
+def inject_device_filters():
+	return dict(device_filters = Device.FILTERS)
 
 def start(theHouse, debug = False):
 	# save repeater for handler classes to use
