@@ -1,4 +1,5 @@
 from flask import Flask, request, render_template, redirect, url_for
+from ra_house import Device
 
 app = Flask(__name__)
 house = None
@@ -37,6 +38,10 @@ def demo_set_output(iid):
 def list_areas(criteria):
 	areas = house.get_areas_with_devices(criteria)
 	return render_template('areaList.html', areas = areas)
+
+@app.context_processor
+def inject_device_queries():
+	return dict(device_queries = Device.QUERIES)
 
 def start(theHouse, debug = False):
 	# save repeater for handler classes to use

@@ -19,29 +19,19 @@ class Device(object):
 		self.house._set_output_level(self.iid, level)
 	
 	# queries
-	def is_on(self):
-		return False # subclass must override
-	
-	def is_off(self):
-		return False # subclass must override
+	QUERIES = [ 'on', 'off', 'open', 'closed', 'light', 'shade', 'contactclosure', 'all' ]
 
-	def is_open(self):
-		return False # subclass must override
-
-	def is_closed(self):
-		return False # subclass must override
-	
-	def is_light(self):
-		return False # subclass must override
-
-	def is_shade(self):
-		return False # subclass must override
-
-	def is_contactclosure(self):
-		return False # subclass must override
+	def is_dummy(self):
+		return False
 
 	def is_all(self):
 		return True
+
+# Add the rest of the base-class fallthrough query handles to the Device class
+for query_name in Device.QUERIES:
+	method_name = 'is_' + query_name
+	if not hasattr(Device, method_name):
+		setattr(Device, method_name, Device.is_dummy)
 
 		
 class OutputDevice(Device):
@@ -132,18 +122,9 @@ class DeviceZone(object):
 		return devs
 
 	# queries
-	# XXX metaprogram this! has_on, etc should work too...
-	def has_all(self):
-		return True
-	
-	def has_light(self):
-		return any(dev.is_light() for dev in self.get_all_devices())
-		
-	def has_shade(self):
-		return any(dev.is_shade() for dev in self.get_all_devices())
-		
-	def has_contactclosure(self):
-		return any(dev.is_contactclosure() for dev in self.get_all_devices())
+	def has_general(self, query_name):
+		return any(getattr(dev, 'is_' + query_name)() for dev in self.get_all_devices())
+	# After this class is defined, we will autogenerate a bunch of specializations of this
 
 	# interface to enumerate contained devices and areas
 	def get_all_devices(self):
@@ -181,6 +162,13 @@ class DeviceZone(object):
 					return False
 			return lambda area: area_has_child(area, childtype)
 		return self.get_areas_matching(hasChildP(childtype))
+
+# Automatically wrap the "is" device queries as "has" zone queries
+for query_name in Device.QUERIES:
+	#setattr(DeviceZone, 'has_' + query_name, lambda self: DeviceZone.has_general(self, query_name))
+	def has_specialized(self, query_name = query_name): # XXX work around Python lexical closure issue
+		return DeviceZone.has_general(self, query_name)
+	setattr(DeviceZone, 'has_' + query_name, has_specialized)
 
 
 class House(DeviceZone):
