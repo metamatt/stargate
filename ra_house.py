@@ -166,10 +166,8 @@ class DeviceZone(object):
 
 # Automatically wrap the "is" device queries as "has" zone queries
 for query_name in Device.QUERIES:
-	#setattr(DeviceZone, 'has_' + query_name, lambda self: DeviceZone.has_general(self, query_name))
-	def has_specialized(self, query_name = query_name): # XXX work around Python lexical closure issue
-		return DeviceZone.has_general(self, query_name)
-	setattr(DeviceZone, 'has_' + query_name, has_specialized)
+	# Note lambda-takes-extra-arg-with-default hack to capture current *value* of query_name
+	setattr(DeviceZone, 'has_' + query_name, lambda self, query_name = query_name: DeviceZone.has_general(self, query_name))
 
 
 class House(DeviceZone):
