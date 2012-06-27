@@ -1,15 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock title %}
+{% block content %}
+
 <p>
-List outputs:
+	Outputs:
 	
-{% for status in all_filters %}
-	<a href='/outputs/{{ status }}'>{{ status }}</a>
-{% endfor %}
+	{% for status in all_filters %}
+		<a href='/outputs/{{ status }}'>{{ status }}</a>
+	{% endfor %}
 </p>
 
 <p>
-List areas:
+	Areas:
 
-{% for status in all_filters %}
-	<a href='/areas/{{ status }}'>{{ status }}</a>
-{% endfor %}
+	{% for status in all_filters %}
+		<a href='/areas/{{ status }}'>{{ status }}</a>
+	{% endfor %}
 </p>
+
+{% endblock content %}

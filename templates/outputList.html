@@ -1,15 +1,14 @@
-{{ outputs|length }} devices
-{% if area %}
-	in area <a href="/area/{{ area.iid }}">{{ area.name }}</a>
-{% endif %}
-matching filter:
-{% for fname in all_filters %}
-	{% if fname in active_filters or (fname == 'all' and active_filters == []) %}
-		<b>{{ fname }}</b>
-	{% else %}
-		<a href="{{ fname }}">{{ fname }}</a>
+{% extends "base.html" %}
+{% block title %}Outputs{% endblock title %}
+{% block content %}
+
+<p>
+	{{ outputs|length }} devices
+	{% if area %}
+		in area <a href="/area/{{ area.iid }}">{{ area.name }}</a>
 	{% endif %}
-{% endfor %}
+	{% include 'filterbar.html' %}
+</p>
 <ul>
 	{% for output_group in outputs | groupby('zone') %}
 		{% for output in output_group.list %}
@@ -31,4 +30,4 @@ matching filter:
 	{% endfor %}
 </ul>
 
-<a href="/">back to top</a>
+{% endblock content %}

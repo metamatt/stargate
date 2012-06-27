@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% block head %}
+    <link rel="stylesheet" type=text/css href="{{ url_for('static', filename='style.css') }}" />
+    <title>{% block title %}{% endblock title %} - Stargate</title>
+    {% endblock head %}
+</head>
+<body>
+    <div id="header">
+		{% block header %}
+			<h1><a href="/">Stargate</a></h1>
+		{% endblock header %}
+	</div>
+    <div id="content">
+		{% block content %}{% endblock content %}
+	</div>
+    <div id="footer">
+        {% block footer %}
+			<hr>
+			<a href="/">back to top</a>
+	        <!--| Stargate &copy; Copyright 2012 by <a href="http://metamatt.com/">Matt Ginzton</a>. -->
+        {% endblock footer %}
+    </div>
+</body>
+</html>

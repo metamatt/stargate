@@ -1,15 +1,15 @@
-{{ areas|length }} areas matching filter:
-{% for fname in all_filters %}
-	{% if fname in active_filters or (fname == 'all' and active_filters == []) %}
-		<b>{{ fname }}</b>
-	{% else %}
-		<a href="{{ fname }}">{{ fname }}</a>
-	{% endif %}
-{% endfor %}
+{% extends "base.html" %}
+{% block title %}Areas{% endblock title %}
+{% block content %}
+
+<p>
+	{{ areas|length }} areas
+	{% include 'filterbar.html' %}
+</p>
 <ul>
 	{% for area in areas %}
 		<li><a href="/area/{{ area.iid }}">{{ area.name }}</a></li>
 	{% endfor %}
 </ul>
 
-<a href="/">back to top</a>
+{% endblock content %}
