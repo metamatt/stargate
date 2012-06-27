@@ -6,25 +6,21 @@ house = None
 
 @app.route('/')
 def root_index():
-	return '<a href=/demo/>Demo</a>'
-
-@app.route('/demo/')
-def demo_index():
 	return render_template('index.html')
 
-@app.route('/output/list/', defaults = {'filterlist': 'all'})
-@app.route('/output/list/<filterlist>')
+@app.route('/outputs/', defaults = {'filterlist': 'all'})
+@app.route('/outputs/<filterlist>')
 def list_outputs(filterlist):
 	filters = filterlist.split(',')
 	outputs = house.get_devices_filtered_by(filters)
 	return render_template('outputList.html', outputs = outputs, active_filters = filters)
 
-@app.route('/output/get/<int:iid>')
+@app.route('/output/<int:iid>')
 def demo_get_output(iid):
 	output = house.get_device_by_iid(iid)
 	return render_template('outputList.html', outputs = [output])
 
-@app.route('/output/set/<int:iid>', methods = ['POST'])
+@app.route('/output/<int:iid>', methods = ['POST'])
 def demo_set_output(iid):
 	params = request.form
 	output = house.get_device_by_iid(iid)
@@ -36,8 +32,8 @@ def demo_set_output(iid):
 	time.sleep(0.3)
 	return redirect(url_for('demo_get_output', iid = iid))
 
-@app.route('/area/list/', defaults = {'filterlist': 'all'})
-@app.route('/area/list/<filterlist>')
+@app.route('/areas/', defaults = {'filterlist': 'all'})
+@app.route('/areas/<filterlist>')
 def list_areas(filterlist):
 	filters = filterlist.split(',')
 	areas = house.get_areas_filtered_by(filters)
