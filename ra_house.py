@@ -10,6 +10,7 @@ class Device(object):
 		self.zone = zone
 		self.iid = iid
 		house._register_device(iid, self)
+		self.statemap = {}
 		
 	# interface to get/set output levels (device scope)
 	def get_level(self):
@@ -18,23 +19,24 @@ class Device(object):
 	def set_level(self, level):
 		self.house._set_output_level(self.iid, level)
 	
-	# filters
-	FILTERS = [ 'on', 'off', 'open', 'closed', 'light', 'shade', 'contactclosure', 'all' ]
-
-	def is_all(self):
-		return True
+	def is_in_state(self, state):
+		if self.statemap.has_key(state):
+			handler = self.statemap[state]
+			if hasattr(handler, '__call__'):
+				return handler()
+			return handler
+		if state == 'all':
+			return True
+		return False
 		
-	@classmethod
-	def _add_generated_methods(cls):
-		# Add the rest of the base-class fallthrough filter handlers
-		for filter_name in Device.FILTERS:
-			method_name = 'is_' + filter_name
-			if not hasattr(cls, method_name):
-				setattr(cls, method_name, lambda dev: False)
+	def get_current_states(self):
+		return [state for state in self.get_possible_states() if self.is_in_state(state)]
+	
+	def get_possible_states(self):
+		# return ['all'].extend(self.statemap.keys()) # XXX annoying that this silently returns None!
+		return self.statemap.keys() + ['all']
 
-Device._add_generated_methods()
 
-		
 class OutputDevice(Device):
 	def __init__(self, house, zone, output):
 		super(OutputDevice, self).__init__(house, zone, output.iid)
@@ -44,9 +46,11 @@ class OutputDevice(Device):
 class SwitchedOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(SwitchedOutput, self).__init__(house, zone, output)
-
-	def is_light(self):
-		return True
+		self.statemap = {
+			'light': True,
+			'on': self.is_on,
+			'off': self.is_off,
+		}
 
 	def is_on(self):
 		return self.get_level() > 0
@@ -63,9 +67,11 @@ class DimmedOutput(SwitchedOutput):
 class ShadeOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ShadeOutput, self).__init__(house, zone, output)
-
-	def is_shade(self):
-		return True
+		self.statemap = {
+			'shade': True,
+			'closed': self.is_closed,
+			'open': self.is_open,
+		}
 
 	# XXX should we define "partially open", "fully open", "partially closed", "fully closed"?
 	# and a half-open shade is both partially open and closed? Otherwise, what is it?
@@ -80,9 +86,9 @@ class ContactClosureOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ContactClosureOutput, self).__init__(house, zone, output)
 		self.pulsed = output.get_type() == 'CCO_PULSED'
-	
-	def is_contactclosure(self):
-		return True
+		self.statemap = {
+			'contactclosure': True,
+		}
 
 
 def create_device_for_output(house, zone, output):
@@ -126,57 +132,35 @@ class DeviceZone(object):
 		return devs
 
 	# filters
-	def has_general(self, filter_name):
-		return any(getattr(dev, 'is_' + filter_name)() for dev in self.get_all_devices())
-	# After this class is defined, we will autogenerate a bunch of specializations of this
-	# by invoking the following:
-	@classmethod
-	def _add_generated_methods(cls):
-		# Automatically wrap the "is" device filters as "has" zone filters
-		for filter_name in Device.FILTERS:
-			# Note lambda-takes-extra-arg-with-default hack to capture current *value* of filter_name
-			setattr(cls, 'has_' + filter_name, lambda self, filter_name = filter_name: DeviceZone.has_general(self, filter_name))
+	def has_device_in_state(self, state):
+		return any(dev.is_in_state(state) for dev in self.get_all_devices())
 
 	# interface to enumerate contained devices and areas
 	def get_all_devices(self):
 		return self._children_of_type(Device)
 
 	def get_devices_filtered_by(self, filters):
-		def inStateP(state):
-			def device_is_in_state(dev, state):
-				state_pred = 'is_' + state
-				if hasattr(dev, state_pred):
-					return getattr(dev, state_pred)()
-				return False
-			return lambda dev: device_is_in_state(dev, state)
 		devs = self.get_all_devices()
 		for state in filters:
-			devs = filter(inStateP(state), devs)
+			devs = filter(lambda dev: dev.is_in_state(state), devs)
 		return devs
 
 	def get_all_areas(self):
 		return self._children_of_type(DeviceZone)
 
 	def get_areas_filtered_by(self, filters):
-		def hasChildP(childtype):
-			def area_has_child(area, childtype):
-				type_pred = 'has_' + childtype
-				if hasattr(area, type_pred):
-					return getattr(area, type_pred)()
-				return False
-			return lambda area: area_has_child(area, childtype)
 		areas = self.get_all_areas()
 		for state in filters:
-			areas = filter(hasChildP(state), areas)
+			areas = filter(lambda area: area.has_device_in_state(state), areas)
 		return areas
 	
 	def get_relevant_filters(self):
-		# XXX need to have concept of filters that are active now, those that aren't but could be, and those that just aren't
-		# tie this into code that knows how many of each?
-		# also want reasonable way to sort the resulting filters
-		return Device.FILTERS
-
-DeviceZone._add_generated_methods()
+		possible = set()
+		for dev in self.get_all_devices():
+			possible.update(dev.get_possible_states())
+		#return list(possible)
+		order = ['light', 'off', 'on', 'shade', 'open', 'closed', 'contactclosure', 'all']
+		return [state for state in order if state in possible]
 
 
 class House(DeviceZone):
