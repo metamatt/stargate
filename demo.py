@@ -18,9 +18,7 @@ def enumerate_outputs(filterlist):
 @app.route('/output/<int:iid>')
 def get_output(iid):
 	output = house.get_device_by_iid(iid)
-	# XXX need to separate "output" and "list of outputs". This shouldn't be a list of 1,
-	# and the filter bar doesn't apply.
-	return render_template('outputList.html', outputs = [output])
+	return render_template('output.html', output = output)
 
 @app.route('/output/<int:iid>', methods = ['POST'])
 def set_output(iid):

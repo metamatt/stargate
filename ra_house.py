@@ -27,14 +27,15 @@ class Device(object):
 			return handler
 		if state == 'all':
 			return True
+		if state == self.type:
+			return True
 		return False
 		
 	def get_current_states(self):
 		return [state for state in self.get_possible_states() if self.is_in_state(state)]
 	
 	def get_possible_states(self):
-		# return ['all'].extend(self.statemap.keys()) # XXX annoying that this silently returns None!
-		return self.statemap.keys() + ['all']
+		return self.statemap.keys() + ['all'] + ([ self.type ] if self.type else [])
 
 
 class OutputDevice(Device):
@@ -46,8 +47,8 @@ class OutputDevice(Device):
 class SwitchedOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(SwitchedOutput, self).__init__(house, zone, output)
+		self.type = 'light'
 		self.statemap = {
-			'light': True,
 			'on': self.is_on,
 			'off': self.is_off,
 		}
@@ -67,8 +68,8 @@ class DimmedOutput(SwitchedOutput):
 class ShadeOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ShadeOutput, self).__init__(house, zone, output)
+		self.type = 'shade'
 		self.statemap = {
-			'shade': True,
 			'closed': self.is_closed,
 			'open': self.is_open,
 		}
@@ -86,9 +87,8 @@ class ContactClosureOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ContactClosureOutput, self).__init__(house, zone, output)
 		self.pulsed = output.get_type() == 'CCO_PULSED'
-		self.statemap = {
-			'contactclosure': True,
-		}
+		# XXX should CCOs expose states named "open/closed" or "on/off" or what?
+		self.type = 'contactclosure'
 
 
 def create_device_for_output(house, zone, output):

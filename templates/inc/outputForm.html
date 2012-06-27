@@ -1,0 +1,11 @@
+<form name="{{ outputN }}" action="/output/{{ output.iid }}" method="post">
+	{% set outputN = 'output%d' % output.iid %}
+	{% macro emit_set_to_level_link(iid, level, name) -%}
+		<a href="#" onclick="document.{{ outputN }}.elements['level'].value={{ level }}; document.{{ outputN }}.submit(); return false">{{ name }}</a>
+	{%- endmacro %}
+	<a href="/output/{{ output.iid }}">{{ output.name }}</a>: {{ output.get_level() }}
+	| {{ emit_set_to_level_link(output.iid, 100, 'On') }}
+	| {{ emit_set_to_level_link(output.iid, 50, 'Half') }}
+	| {{ emit_set_to_level_link(output.iid, 0, 'Off') }}
+	| Level (0-100) <input type="range" name="level" min="0" max="100" value="{{ output.get_level() }}"><input type="submit" value="Set">
+</form>
