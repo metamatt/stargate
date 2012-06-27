@@ -1,12 +1,14 @@
-{{ areas|length }} areas
-{% if filters|length %}
-matching filter '{{ filters|join(',') }}'
-{% endif %}
+{{ areas|length }} areas matching filter:
+{% for fname in all_filters %}
+	{% if fname in active_filters %}
+		<b>{{ fname }}</b>
+	{% else %}
+		<a href="{{ fname }}">{{ fname }}</a>
+	{% endif %}
+{% endfor %}
 <ul>
 	{% for area in areas %}
-	<li>
-		<a href='/area/{{ area.iid }}'>{{ area.name }}</a>
-	</li>
+		<li><a href="/area/{{ area.iid }}">{{ area.name }}</a></li>
 	{% endfor %}
 </ul>
 

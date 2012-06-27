@@ -1,7 +1,7 @@
 <p>
 List outputs:
 	
-{% for status in device_filters %}
+{% for status in all_filters %}
 	<a href='/output/list/{{ status }}'>{{ status }}</a>
 {% endfor %}
 </p>
@@ -9,7 +9,7 @@ List outputs:
 <p>
 List areas:
 
-{% for status in device_filters %}
+{% for status in all_filters %}
 	<a href='/area/list/{{ status }}'>{{ status }}</a>
 {% endfor %}
 </p>

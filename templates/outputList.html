@@ -1,28 +1,33 @@
 {{ outputs|length }} devices
 {% if area %}
-in area '{{ area.name }}'
+	in area <a href="/area/{{ area.iid }}">{{ area.name }}</a>
 {% endif %}
-{% if filters|length %}
-matching filter '{{ filters|join(',') }}'
-{% endif %}
+matching filter:
+{% for fname in all_filters %}
+	{% if fname in active_filters %}
+		<b>{{ fname }}</b>
+	{% else %}
+		<a href="{{ fname }}">{{ fname }}</a>
+	{% endif %}
+{% endfor %}
 <ul>
 	{% for output_group in outputs | groupby('zone') %}
-	{% for output in output_group.list %}
-	{% set outputN = 'output%d' % output.iid %}
-	{% macro emit_set_to_level_link(iid, level, name) -%}
-		<a href="#" onclick="document.{{ outputN }}.elements['level'].value={{ level }}; document.{{ outputN }}.submit(); return false">{{ name }}</a>
-	{%- endmacro %}
-	<li>
-		<form name="{{ outputN }}" action="/output/set/{{ output.iid }}" method="post">
-			<a href="/area/{{ output.zone.iid }}">{{ output.zone.name }}</a>
-			<a href="/output/get/{{ output.iid }}">{{ output.name }}</a>: {{ output.get_level() }}
-			| {{ emit_set_to_level_link(output.iid, 100, 'On') }}
-			| {{ emit_set_to_level_link(output.iid, 50, 'Half') }}
-			| {{ emit_set_to_level_link(output.iid, 0, 'Off') }}
-			| Level (0-100) <input type="range" name="level" min="0" max="100" value="{{ output.get_level() }}"><input type="submit" value="Set">
-		</form>
-	</li>
-	{% endfor %}
+		{% for output in output_group.list %}
+			{% set outputN = 'output%d' % output.iid %}
+			{% macro emit_set_to_level_link(iid, level, name) -%}
+				<a href="#" onclick="document.{{ outputN }}.elements['level'].value={{ level }}; document.{{ outputN }}.submit(); return false">{{ name }}</a>
+			{%- endmacro %}
+			<li>
+				<form name="{{ outputN }}" action="/output/set/{{ output.iid }}" method="post">
+					<a href="/area/{{ output.zone.iid }}">{{ output.zone.name }}</a>
+					<a href="/output/get/{{ output.iid }}">{{ output.name }}</a>: {{ output.get_level() }}
+					| {{ emit_set_to_level_link(output.iid, 100, 'On') }}
+					| {{ emit_set_to_level_link(output.iid, 50, 'Half') }}
+					| {{ emit_set_to_level_link(output.iid, 0, 'Off') }}
+					| Level (0-100) <input type="range" name="level" min="0" max="100" value="{{ output.get_level() }}"><input type="submit" value="Set">
+				</form>
+			</li>
+		{% endfor %}
 	{% endfor %}
 </ul>
 
