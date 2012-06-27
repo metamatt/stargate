@@ -5,7 +5,7 @@
 <p>
 	{{ outputs|length }} devices
 	{% if area %}
-		in area <a href="/area/{{ area.iid }}">{{ area.name }}</a>
+		in area <a href="/area/{{ area.iid }}/outputs/">{{ area.name }}</a>
 	{% endif %}
 	{% include 'filterbar.html' %}
 </p>
@@ -18,7 +18,7 @@
 			{%- endmacro %}
 			<li>
 				<form name="{{ outputN }}" action="/output/{{ output.iid }}" method="post">
-					<a href="/area/{{ output.zone.iid }}">{{ output.zone.name }}</a>
+					<a href="/area/{{ output.zone.iid }}/outputs/">{{ output.zone.name }}</a>
 					<a href="/output/{{ output.iid }}">{{ output.name }}</a>: {{ output.get_level() }}
 					| {{ emit_set_to_level_link(output.iid, 100, 'On') }}
 					| {{ emit_set_to_level_link(output.iid, 50, 'Half') }}

@@ -10,18 +10,18 @@ def root_index():
 
 @app.route('/outputs/', defaults = {'filterlist': 'all'})
 @app.route('/outputs/<filterlist>')
-def list_outputs(filterlist):
+def enumerate_outputs(filterlist):
 	filters = filterlist.split(',')
 	outputs = house.get_devices_filtered_by(filters)
 	return render_template('outputList.html', outputs = outputs, active_filters = filters)
 
 @app.route('/output/<int:iid>')
-def demo_get_output(iid):
+def get_output(iid):
 	output = house.get_device_by_iid(iid)
 	return render_template('outputList.html', outputs = [output])
 
 @app.route('/output/<int:iid>', methods = ['POST'])
-def demo_set_output(iid):
+def set_output(iid):
 	params = request.form
 	output = house.get_device_by_iid(iid)
 	level = float(params['level'])
@@ -34,14 +34,14 @@ def demo_set_output(iid):
 
 @app.route('/areas/', defaults = {'filterlist': 'all'})
 @app.route('/areas/<filterlist>')
-def list_areas(filterlist):
+def enumerate_areas(filterlist):
 	filters = filterlist.split(',')
 	areas = house.get_areas_filtered_by(filters)
 	return render_template('areaList.html', areas = areas, active_filters = filters)
 
-@app.route('/area/<int:iid>/', defaults = {'filterlist': 'all'})
-@app.route('/area/<int:iid>/<filterlist>')
-def enumerate_area(iid, filterlist):
+@app.route('/area/<int:iid>/outputs/', defaults = {'filterlist': 'all'})
+@app.route('/area/<int:iid>/outputs/<filterlist>')
+def enumerate_outputs_by_area(iid, filterlist):
 	area = house.get_devicezone_by_iid(iid)
 	filters = filterlist.split(',')
 	outputs = area.get_devices_filtered_by(filters)
