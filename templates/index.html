@@ -5,7 +5,7 @@
 <p>
 	Outputs:
 	
-	{% for status in all_filters %}
+	{% for status in house.get_relevant_filters() %}
 		<a href='/outputs/{{ status }}'>{{ status }}</a>
 	{% endfor %}
 </p>
@@ -13,7 +13,7 @@
 <p>
 	Areas:
 
-	{% for status in all_filters %}
+	{% for status in house.get_relevant_filters() %}
 		<a href='/areas/{{ status }}'>{{ status }}</a>
 	{% endfor %}
 </p>

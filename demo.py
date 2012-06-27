@@ -48,8 +48,8 @@ def enumerate_area(iid, filterlist):
 	return render_template('outputList.html', area = area, outputs = outputs, active_filters = filters)
 
 @app.context_processor
-def inject_device_filters():
-	return dict(all_filters = Device.FILTERS)
+def inject_house():
+	return dict(house = house)
 
 def start(theHouse, debug = False):
 	# save repeater for handler classes to use

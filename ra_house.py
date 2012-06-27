@@ -79,6 +79,7 @@ class ShadeOutput(OutputDevice):
 class ContactClosureOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ContactClosureOutput, self).__init__(house, zone, output)
+		self.pulsed = output.get_type() == 'CCO_PULSED'
 	
 	def is_contactclosure(self):
 		return True
@@ -90,6 +91,7 @@ def create_device_for_output(house, zone, output):
 		"NON_DIM": SwitchedOutput,
 		"SYSTEM_SHADE": ShadeOutput,
 		"CCO_PULSED": ContactClosureOutput,
+		"CCO_MAINTAINED": ContactClosureOutput,
 	}
 	
 	try:
@@ -167,6 +169,12 @@ class DeviceZone(object):
 		for state in filters:
 			areas = filter(hasChildP(state), areas)
 		return areas
+	
+	def get_relevant_filters(self):
+		# XXX need to have concept of filters that are active now, those that aren't but could be, and those that just aren't
+		# tie this into code that knows how many of each?
+		# also want reasonable way to sort the resulting filters
+		return Device.FILTERS
 
 DeviceZone._add_generated_methods()
 

@@ -1,5 +1,6 @@
 matching filter:
-{% for fname in all_filters %}
+{% set filterscope = area if area else house %}
+{% for fname in filterscope.get_relevant_filters() %}
 	{% if fname in active_filters or (fname == 'all' and active_filters == []) %}
 		<b>{{ fname }}</b>
 	{% else %}
