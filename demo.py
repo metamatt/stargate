@@ -45,7 +45,7 @@ def enumerate_area(iid, filterlist):
 	area = house.get_devicezone_by_iid(iid)
 	filters = filterlist.split(',')
 	outputs = area.get_devices_filtered_by(filters)
-	return render_template('outputList.html', area = area, outputs = outputs)
+	return render_template('outputList.html', area = area, outputs = outputs, active_filters = filters)
 
 @app.context_processor
 def inject_device_filters():
