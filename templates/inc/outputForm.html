@@ -1,5 +1,5 @@
+{% set outputN = 'output%d' % output.iid %}
 <form name="{{ outputN }}" action="/output/{{ output.iid }}" method="post">
-	{% set outputN = 'output%d' % output.iid %}
 	{% macro emit_set_to_level_link(iid, level, name) -%}
 		<a href="#" onclick="document.{{ outputN }}.elements['level'].value={{ level }}; document.{{ outputN }}.submit(); return false">{{ name }}</a>
 	{%- endmacro %}

@@ -30,7 +30,7 @@ def set_output(iid):
 	# XXX should make this respond to async operation when it completes; for now just wait a bit
 	import time
 	time.sleep(0.3)
-	return redirect(url_for('demo_get_output', iid = iid))
+	return redirect(url_for('get_output', iid = iid))
 
 @app.route('/areas/', defaults = {'filterlist': 'all'})
 @app.route('/areas/<filterlist>')
