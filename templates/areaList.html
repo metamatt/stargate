@@ -7,7 +7,7 @@
 	{% include 'inc/filterbar.html' %}
 </p>
 <ul>
-	{% for area in areas %}
+	{% for area in areas | sort(attribute = 'name') %}
 		<li><a href="/area/{{ area.iid }}/outputs/">{{ area.name }}</a></li>
 	{% endfor %}
 </ul>
