@@ -3,7 +3,7 @@
 {% block content %}
 
 <p>
-	Area <a href="/area/{{ output.zone.iid }}/outputs/">{{ output.zone.name }}</a>:
+	Area <a href="{{ url_for('enumerate_outputs_by_area', iid = output.zone.iid) }}">{{ output.zone.name }}</a>:
 	{% include 'inc/outputForm.html' %}
 </p>
 

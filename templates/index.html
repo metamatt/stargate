@@ -6,7 +6,7 @@
 	Outputs:
 	
 	{% for status in house.get_relevant_filters() %}
-		<a href='/outputs/{{ status }}'>{{ status }}</a>
+		<a href='{{ url_for('enumerate_outputs', filterlist = status) }}'>{{ status }}</a>
 	{% endfor %}
 </p>
 
@@ -14,7 +14,7 @@
 	Areas:
 
 	{% for status in house.get_relevant_filters() %}
-		<a href='/areas/{{ status }}'>{{ status }}</a>
+		<a href='{{ url_for('enumerate_areas', filterlist = status) }}'>{{ status }}</a>
 	{% endfor %}
 </p>
 

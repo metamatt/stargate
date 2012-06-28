@@ -5,14 +5,14 @@
 <p>
 	{{ outputs|length }} devices
 	{% if area %}
-		in area <a href="/area/{{ area.iid }}/outputs/">{{ area.name }}</a>
+		in area <a href="{{ url_for('enumerate_outputs_by_area', iid = area.iid) }}">{{ area.name }}</a>
 	{% endif %}
 	{% include 'inc/filterbar.html' %}
 </p>
 {% for output_group in outputs | groupby('zone') | sort(attribute = 'grouper.name') %}
 	{% if not area %}
 		<!-- this is redundant if area was specified -->
-		<a href="/area/{{ output_group.grouper.iid }}/outputs">{{ output_group.grouper.name }}</a>
+		<a href="/area/{{ url_for('enumerate_outputs_by_area', iid = output_group.grouper.iid) }}/outputs">{{ output_group.grouper.name }}</a>
 	{% endif %}
 	<ul>
 		{% for output in output_group.list %}

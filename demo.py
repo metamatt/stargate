@@ -5,7 +5,7 @@ app = Flask(__name__)
 house = None
 
 @app.route('/')
-def root_index():
+def root():
 	return render_template('index.html')
 
 @app.route('/outputs/', defaults = {'filterlist': 'all'})
