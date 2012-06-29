@@ -3,18 +3,18 @@
 {% block content %}
 
 <p>
-	Outputs:
+	<a href="{{ url_for('enumerate_outputs') }}">Outputs:</a>
 	
 	{% for status in house.get_relevant_filters() %}
-		<a href='{{ url_for('enumerate_outputs', filterlist = status) }}'>{{ status }}</a>
+		<a href="{{ url_for('enumerate_outputs', filterlist = status) }}">{{ status }}</a>
 	{% endfor %}
 </p>
 
 <p>
-	Areas:
+	<a href="{{ url_for('enumerate_areas') }}">Areas:</a>
 
 	{% for status in house.get_relevant_filters() %}
-		<a href='{{ url_for('enumerate_areas', filterlist = status) }}'>{{ status }}</a>
+		<a href="{{ url_for('enumerate_areas', filterlist = status) }}">{{ status }}</a>
 	{% endfor %}
 </p>
 
