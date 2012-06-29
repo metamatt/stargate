@@ -3,7 +3,7 @@
 {% block content %}
 
 <p>
-	{{ outputs|length }} devices
+	{{ count_list_items(outputs, 'device') }}
 	{% if area %}
 		in area <a href="{{ url_for('enumerate_outputs_by_area', iid = area.iid) }}">{{ area.name }}</a>
 	{% endif %}
@@ -11,14 +11,19 @@
 </p>
 {% for output_group in outputs | groupby('zone') | sort(attribute = 'grouper.name') %}
 	{% if not area %}
-		<!-- this is redundant if area was specified -->
-		<a href="/area/{{ url_for('enumerate_outputs_by_area', iid = output_group.grouper.iid) }}/outputs">{{ output_group.grouper.name }}</a>
+		<!-- redundant when scoped to a single area -->
+		In area <a href="{{ url_for('enumerate_outputs_by_area', iid = output_group.grouper.iid) }}">{{ output_group.grouper.name }}</a>
 	{% endif %}
 	<ul>
-		{% for output in output_group.list %}
-			<li>
-				{% include 'inc/outputForm.html' %}
-			</li>
+		{% for type_group in output_group.list | groupby('type') %}
+			{{ count_list_items(type_group.list, type_group.grouper) }}: set all to [ on | off ]
+			<ul>
+				{% for output in type_group.list %}
+					<li>
+						{% include 'inc/outputForm.html' %}
+					</li>
+				{% endfor %}
+			</ul>
 		{% endfor %}
 	</ul>
 {% endfor %}

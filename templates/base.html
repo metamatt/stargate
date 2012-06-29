@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+{% macro count_list_items(list, typename) -%}
+	{{ list | length }} {{ typename }}{{ 's' if list | length > 1 }}
+{%- endmacro %}
 <html lang="en">
 <head>
     {% block head %}

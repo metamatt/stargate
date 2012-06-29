@@ -3,7 +3,7 @@
 {% block content %}
 
 <p>
-	{{ areas|length }} areas
+	{{ count_list_items(areas, 'area') }}
 	{% include 'inc/filterbar.html' %}
 </p>
 <ul>
