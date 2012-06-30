@@ -3,20 +3,36 @@
 {% block content %}
 
 <p>
-	{{ count_list_items(outputs, 'device') }}
-	{% if area %}
-		in area <a href="{{ url_for('enumerate_outputs_by_area', iid = area.iid) }}">{{ area.name }}</a>
+	{{ count_list_items(outputs, 'output') }}
+	{% if area_filter %}
+		in area <a href="{{ url_for('enumerate_outputs_by_area', iid = area_filter.iid) }}">{{ area_filter.name }}</a>
 	{% endif %}
 	{% include 'inc/filterbar.html' %}
 </p>
 {% for output_group in outputs | groupby('zone') | sort(attribute = 'grouper.name') %}
-	{% if not area %}
+	{% set area = output_group.grouper %}
+	{% if not area_filter %}
 		<!-- redundant when scoped to a single area -->
-		In area <a href="{{ url_for('enumerate_outputs_by_area', iid = output_group.grouper.iid) }}">{{ output_group.grouper.name }}</a>
+		In area <a href="{{ url_for('enumerate_outputs_by_area', iid = area.iid) }}">{{ area.name }}</a>
 	{% endif %}
 	<ul>
 		{% for type_group in output_group.list | groupby('type') %}
-			{{ count_list_items(type_group.list, type_group.grouper) }}: set all to [ on | off ]
+			{% set commonActionForm = 'commonActions' + area.iid|string + type_group.grouper %}
+			<form name="{{ commonActionForm }}" action="{{ url_for('set_outputs_to_state') }}" method="post">
+				{{ count_list_items(type_group.list, type_group.grouper) }}
+			
+				{% set common_actions = house.get_supported_actions(type_group.list) | order_states %}
+				{% if common_actions|length %}
+					<input type="hidden" name="outputs" value="{{ type_group.list | join(',', attribute = 'iid') }}">
+					<input type="hidden" name="state" value="">
+					(set all to:
+					{% for action in common_actions %}
+						<a href="#" onclick="document.{{ commonActionForm }}.elements['state'].value='{{ action }}'; document.{{ commonActionForm }}.submit(); return false">{{ action }}</a>
+					{% endfor %}
+					)
+				{% endif %}
+			</form>
+
 			<ul>
 				{% for output in type_group.list %}
 					<li>

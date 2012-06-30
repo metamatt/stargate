@@ -1,9 +1,21 @@
 matching filter:
 {% set filterscope = area if area else house %}
-{% for fname in filterscope.get_relevant_filters() %}
-	{% if fname in active_filters or (fname == 'all' and active_filters == []) %}
-		<b>{{ fname }}</b>
+{% macro decorate_active(name) %}
+	{% if name in active_filters or (name == 'all' and active_filters == []) %}
+		<b>{{ name }}</b>
 	{% else %}
-		<a href="{{ fname }}">{{ fname }}</a>
+		<a href="{{ name }}">{{ name }}</a>
 	{% endif %}
+{% endmacro %}
+
+{% set type_state_map = filterscope.get_device_type_state_map() %}
+{% for type in type_state_map | order_states %}
+{% set states = type_state_map[type] | order_states %}
+	{{ decorate_active(type) }}
+
+	{% if states|length %}({% endif %}
+	{% for state in states %}
+		{{ decorate_active(state) }}
+	{% endfor %}
+	{% if states|length %}){% endif %}
 {% endfor %}

@@ -5,12 +5,21 @@
 class Device(object):
 	# individual RadioRa device -- switch(load), shade, remote, keypad, etc
 	# XXX the split between this and OutputDevice is arbitrary right now, I'm still figuring out where it lies
+
+	KNOWN_STATES_IN_ORDER = ['light', 'closed', 'off', 'half', 'on', 'shade', 'open', 'contactclosure', 'all']
+	@staticmethod
+	def order_states(states):
+		return [state for state in Device.KNOWN_STATES_IN_ORDER if state in states]
+
 	def __init__(self, house, zone, iid):
+		self.type = None
 		self.house = house
 		self.zone = zone
 		self.iid = iid
+		self.level_step = 100
+		self._possible_states = None
+		self._possible_actions = None
 		house._register_device(iid, self)
-		self.statemap = {}
 		
 	# interface to get/set output levels (device scope)
 	def get_level(self):
@@ -20,22 +29,34 @@ class Device(object):
 		self.house._set_output_level(self.iid, level)
 	
 	def is_in_state(self, state):
-		if self.statemap.has_key(state):
-			handler = self.statemap[state]
-			if hasattr(handler, '__call__'):
-				return handler()
-			return handler
+		handler = 'is_' + state
+		if hasattr(self, handler):
+			return getattr(self, handler)()
 		if state == 'all':
 			return True
 		if state == self.type:
 			return True
 		return False
-		
+
+	def go_to_state(self, state):
+		handler = 'be_' + state
+		if not hasattr(self, handler):
+			return False
+		getattr(self, handler)()
+		return True
+
 	def get_current_states(self):
 		return [state for state in self.get_possible_states() if self.is_in_state(state)]
 	
 	def get_possible_states(self):
-		return self.statemap.keys() + ['all'] + ([ self.type ] if self.type else [])
+		if not self._possible_states:
+			self._possible_states = set([state for state in Device.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
+		return self._possible_states
+		
+	def get_possible_actions(self):
+		if not self._possible_actions:
+			self._possible_actions = set([state for state in Device.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
+		return self._possible_actions
 
 
 class OutputDevice(Device):
@@ -48,47 +69,71 @@ class SwitchedOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(SwitchedOutput, self).__init__(house, zone, output)
 		self.type = 'light'
-		self.statemap = {
-			'on': self.is_on,
-			'off': self.is_off,
-		}
 
 	def is_on(self):
 		return self.get_level() > 0
 
+	def be_on(self):
+		self.set_level(100)
+
 	def is_off(self):
 		return self.get_level() == 0
+		
+	def be_off(self):
+		self.set_level(0)
 
 
 class DimmedOutput(SwitchedOutput):
 	def __init__(self, house, zone, output):
 		super(DimmedOutput, self).__init__(house, zone, output)
+		self.level_step = 1
+
+	def be_half(self):
+		self.set_level(50)
 
 
 class ShadeOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ShadeOutput, self).__init__(house, zone, output)
 		self.type = 'shade'
-		self.statemap = {
-			'closed': self.is_closed,
-			'open': self.is_open,
-		}
+		self.level_step = 1
+	
+	def be_half(self):
+		self.set_level(50)
 
 	# XXX should we define "partially open", "fully open", "partially closed", "fully closed"?
 	# and a half-open shade is both partially open and closed? Otherwise, what is it?
 	def is_closed(self):
 		return self.get_level() == 0
+	
+	def be_closed(self):
+		self.set_level(0)
 
 	def is_open(self):
 		return self.get_level() >= 100 # sometimes set to 100.01!
+
+	def be_open(self):
+		self.set_level(100)
 
 
 class ContactClosureOutput(OutputDevice):
 	def __init__(self, house, zone, output):
 		super(ContactClosureOutput, self).__init__(house, zone, output)
 		self.pulsed = output.get_type() == 'CCO_PULSED'
-		# XXX should CCOs expose states named "open/closed" or "on/off" or what?
 		self.type = 'contactclosure'
+		
+	def is_closed(self):
+		return self.get_level() == 0
+
+	def be_closed(self):
+		self.set_level(0)
+
+	def is_open(self):
+		return self.get_level() > 0
+
+	def be_open(self):
+		self.set_level(100)
+
 
 
 def create_device_for_output(house, zone, output):
@@ -153,15 +198,19 @@ class DeviceZone(object):
 		for state in filters:
 			areas = filter(lambda area: area.has_device_in_state(state), areas)
 		return areas
-	
-	def get_relevant_filters(self):
-		possible = set()
-		for dev in self.get_all_devices():
-			possible.update(dev.get_possible_states())
-		#return list(possible)
-		order = ['light', 'off', 'on', 'shade', 'open', 'closed', 'contactclosure', 'all']
-		return [state for state in order if state in possible]
 
+	def get_device_type_state_map(self):
+		possible = { 'all': set() }
+		for dev in self.get_all_devices():
+			if not possible.has_key(dev.type):
+				possible[dev.type] = set()
+			possible[dev.type].update(dev.get_possible_states())
+		return possible
+
+	@staticmethod
+	def get_supported_actions(devices):
+		return reduce(set.intersection, map(lambda dev: dev.get_possible_actions(), devices))
+		
 
 class House(DeviceZone):
 	def __init__(self, repeater, layout):
