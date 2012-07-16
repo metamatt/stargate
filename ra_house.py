@@ -1,25 +1,40 @@
 # (c) 2012 Matt Ginzton, matt@ginzton.net
+#
+# High-level interface to Lutron RadioRa2 system.
 
 
+class BaseDevice(object):
+	# Individual RadioRa device -- includes both controllable outputs (what Lutron calls an "output")
+	# and we will subclass as "OutputDevice") and inputs/controls (what Lutron calls an "input", I
+	# would typically call a "keypad", and we will subclass as "ControlDevice").
 
-class Device(object):
-	# individual RadioRa device -- switch(load), shade, remote, keypad, etc
-	# XXX the split between this and OutputDevice is arbitrary right now, I'm still figuring out where it lies
+	house = None
+	zone = None
+	iid = None
+	name = None
+	
+	def __init__(self, zone, iid, name):
+		self.house = zone.house
+		self.zone = zone
+		self.iid = iid
+		self.name = name
+
+
+class OutputDevice(BaseDevice):
+	# Common device subclass for controllable outputs (lights, shades, appliances).
 
 	KNOWN_STATES_IN_ORDER = ['light', 'closed', 'off', 'half', 'on', 'shade', 'open', 'contactclosure', 'all']
 	@staticmethod
 	def order_states(states):
-		return [state for state in Device.KNOWN_STATES_IN_ORDER if state in states]
+		return [state for state in OutputDevice.KNOWN_STATES_IN_ORDER if state in states]
 
-	def __init__(self, house, zone, iid):
+	def __init__(self, zone, output):
+		super(OutputDevice, self).__init__(zone, output.iid, output.name)
 		self.type = None
-		self.house = house
-		self.zone = zone
-		self.iid = iid
 		self.level_step = 100
 		self._possible_states = None
 		self._possible_actions = None
-		house._register_device(iid, self)
+		self.house._register_device(self)
 		
 	# interface to get/set output levels (device scope)
 	def get_level(self):
@@ -50,24 +65,18 @@ class Device(object):
 	
 	def get_possible_states(self):
 		if not self._possible_states:
-			self._possible_states = set([state for state in Device.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
+			self._possible_states = set([state for state in OutputDevice.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
 		return self._possible_states
 		
 	def get_possible_actions(self):
 		if not self._possible_actions:
-			self._possible_actions = set([state for state in Device.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
+			self._possible_actions = set([state for state in OutputDevice.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
 		return self._possible_actions
 
 
-class OutputDevice(Device):
-	def __init__(self, house, zone, output):
-		super(OutputDevice, self).__init__(house, zone, output.iid)
-		self.name = output.name
-
-
 class SwitchedOutput(OutputDevice):
-	def __init__(self, house, zone, output):
-		super(SwitchedOutput, self).__init__(house, zone, output)
+	def __init__(self, zone, output):
+		super(SwitchedOutput, self).__init__(zone, output)
 		self.type = 'light'
 
 	def is_on(self):
@@ -84,8 +93,8 @@ class SwitchedOutput(OutputDevice):
 
 
 class DimmedOutput(SwitchedOutput):
-	def __init__(self, house, zone, output):
-		super(DimmedOutput, self).__init__(house, zone, output)
+	def __init__(self, zone, output):
+		super(DimmedOutput, self).__init__(zone, output)
 		self.level_step = 1
 
 	def be_half(self):
@@ -93,8 +102,8 @@ class DimmedOutput(SwitchedOutput):
 
 
 class ShadeOutput(OutputDevice):
-	def __init__(self, house, zone, output):
-		super(ShadeOutput, self).__init__(house, zone, output)
+	def __init__(self, zone, output):
+		super(ShadeOutput, self).__init__(zone, output)
 		self.type = 'shade'
 		self.level_step = 1
 	
@@ -117,8 +126,8 @@ class ShadeOutput(OutputDevice):
 
 
 class ContactClosureOutput(OutputDevice):
-	def __init__(self, house, zone, output):
-		super(ContactClosureOutput, self).__init__(house, zone, output)
+	def __init__(self, zone, output):
+		super(ContactClosureOutput, self).__init__(zone, output)
 		self.pulsed = output.get_type() == 'CCO_PULSED'
 		self.type = 'contactclosure'
 		
@@ -136,7 +145,8 @@ class ContactClosureOutput(OutputDevice):
 
 
 
-def create_device_for_output(house, zone, output):
+def create_device_for_output(zone, output):
+	# Static factory for correct OutputDevice subclass matching Lutron device type.
 	map_lutron_output_to_class = {
 		"INC": DimmedOutput,
 		"NON_DIM": SwitchedOutput,
@@ -147,25 +157,28 @@ def create_device_for_output(house, zone, output):
 	
 	try:
 		cls = map_lutron_output_to_class[output.get_type()]
-	except Exception as ex:
+	except Exception as ex: # XXX fall back on default/generic case
 		print ex
 		cls = OutputDevice
 
-	return cls(house, zone, output)
+	return cls(zone, output)
 
 
 class DeviceZone(object):
-	# grouping container: area or zone containing a set of devices and/or zones
+	# grouping container: zone containing a set of devices and/or other zones
+	# (Matches Lutron's "area" concept).
 	
-	# constructor
+	# XXX should clean up constructor arguments, deal with nested areas, and avoid
+	# needing to pass the house to nested areas. This should just take a "parent"
+	# argument.
 	def __init__(self, house, area):
 		self.house = house
 		if area:
 			self.iid = area.iid
 			self.name = area.name
-			self.members = [create_device_for_output(house, self, output) for output in area.get_outputs()]
-			house._register_zone(self.iid, self)
-	
+			self.members = [create_device_for_output(self, output) for output in area.get_outputs()]
+			house._register_zone(self)
+
 	def _children_of_type(self, cls):
 		# build flat list of children
 		devs = []
@@ -182,7 +195,7 @@ class DeviceZone(object):
 
 	# interface to enumerate contained devices and areas
 	def get_all_devices(self):
-		return self._children_of_type(Device)
+		return self._children_of_type(OutputDevice)
 
 	def get_devices_filtered_by(self, filters):
 		devs = self.get_all_devices()
@@ -240,11 +253,11 @@ class House(DeviceZone):
 		return self.zones[iid]
 
 	# private interface for owned objects to talk to repeater
-	def _register_device(self, iid, device):
-		self.devices[iid] = device
+	def _register_device(self, device):
+		self.devices[device.iid] = device
 		
-	def _register_zone(self, iid, zone):
-		self.zones[iid] = zone
+	def _register_zone(self, zone):
+		self.zones[zone.iid] = zone
 
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)

@@ -1,11 +1,11 @@
 from flask import Flask, request, render_template, redirect, url_for
-from ra_house import Device
+from ra_house import OutputDevice
 import time
 
 app = Flask(__name__)
 house = None
 
-app.jinja_env.filters['order_states'] = Device.order_states
+app.jinja_env.filters['order_states'] = OutputDevice.order_states
 
 @app.route('/')
 def root():
