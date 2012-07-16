@@ -9,7 +9,7 @@
 	{% endif %}
 	{% include 'inc/filterbar.html' %}
 </p>
-{% for output_group in outputs | groupby('zone') | sort(attribute = 'grouper.name') %}
+{% for output_group in outputs | groupby('area') | sort(attribute = 'grouper.name') %}
 	{% set area = output_group.grouper %}
 	{% if not area_filter %}
 		<!-- redundant when scoped to a single area -->

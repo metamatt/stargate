@@ -9,13 +9,13 @@ class BaseDevice(object):
 	# would typically call a "keypad", and we will subclass as "ControlDevice").
 
 	house = None
-	zone = None
+	area = None
 	iid = None
 	name = None
 	
-	def __init__(self, zone, iid, name):
-		self.house = zone.house
-		self.zone = zone
+	def __init__(self, area, iid, name):
+		self.house = area.house
+		self.area = area
 		self.iid = iid
 		self.name = name
 
@@ -28,8 +28,8 @@ class OutputDevice(BaseDevice):
 	def order_states(states):
 		return [state for state in OutputDevice.KNOWN_STATES_IN_ORDER if state in states]
 
-	def __init__(self, zone, output):
-		super(OutputDevice, self).__init__(zone, output.iid, output.name)
+	def __init__(self, area, output):
+		super(OutputDevice, self).__init__(area, output.iid, output.name)
 		self.type = None
 		self.level_step = 100
 		self._possible_states = None
@@ -75,8 +75,8 @@ class OutputDevice(BaseDevice):
 
 
 class SwitchedOutput(OutputDevice):
-	def __init__(self, zone, output):
-		super(SwitchedOutput, self).__init__(zone, output)
+	def __init__(self, area, output):
+		super(SwitchedOutput, self).__init__(area, output)
 		self.type = 'light'
 
 	def is_on(self):
@@ -93,8 +93,8 @@ class SwitchedOutput(OutputDevice):
 
 
 class DimmedOutput(SwitchedOutput):
-	def __init__(self, zone, output):
-		super(DimmedOutput, self).__init__(zone, output)
+	def __init__(self, area, output):
+		super(DimmedOutput, self).__init__(area, output)
 		self.level_step = 1
 
 	def be_half(self):
@@ -102,8 +102,8 @@ class DimmedOutput(SwitchedOutput):
 
 
 class ShadeOutput(OutputDevice):
-	def __init__(self, zone, output):
-		super(ShadeOutput, self).__init__(zone, output)
+	def __init__(self, area, output):
+		super(ShadeOutput, self).__init__(area, output)
 		self.type = 'shade'
 		self.level_step = 1
 	
@@ -126,8 +126,8 @@ class ShadeOutput(OutputDevice):
 
 
 class ContactClosureOutput(OutputDevice):
-	def __init__(self, zone, output):
-		super(ContactClosureOutput, self).__init__(zone, output)
+	def __init__(self, area, output):
+		super(ContactClosureOutput, self).__init__(area, output)
 		self.pulsed = output.get_type() == 'CCO_PULSED'
 		self.type = 'contactclosure'
 		
@@ -145,7 +145,7 @@ class ContactClosureOutput(OutputDevice):
 
 
 
-def create_device_for_output(zone, output):
+def create_device_for_output(area, output):
 	# Static factory for correct OutputDevice subclass matching Lutron device type.
 	map_lutron_output_to_class = {
 		"INC": DimmedOutput,
@@ -161,11 +161,11 @@ def create_device_for_output(zone, output):
 		print ex
 		cls = OutputDevice
 
-	return cls(zone, output)
+	return cls(area, output)
 
 
-class DeviceZone(object):
-	# grouping container: zone containing a set of devices and/or other zones
+class DeviceArea(object):
+	# grouping container: area containing a set of devices and/or other areas
 	# (Matches Lutron's "area" concept).
 	
 	# XXX should clean up constructor arguments, deal with nested areas, and avoid
@@ -177,7 +177,7 @@ class DeviceZone(object):
 			self.iid = area.iid
 			self.name = area.name
 			self.members = [create_device_for_output(self, output) for output in area.get_outputs()]
-			house._register_zone(self)
+			house._register_area(self)
 
 	def _children_of_type(self, cls):
 		# build flat list of children
@@ -185,7 +185,7 @@ class DeviceZone(object):
 		for m in self.members:
 			if isinstance(m, cls):
 				devs.append(m)
-			if isinstance(m, DeviceZone):
+			if isinstance(m, DeviceArea):
 				devs.extend(m._children_of_type(cls))
 		return devs
 
@@ -204,7 +204,7 @@ class DeviceZone(object):
 		return devs
 
 	def get_all_areas(self):
-		return self._children_of_type(DeviceZone)
+		return self._children_of_type(DeviceArea)
 
 	def get_areas_filtered_by(self, filters):
 		areas = self.get_all_areas()
@@ -225,11 +225,11 @@ class DeviceZone(object):
 		return reduce(set.intersection, map(lambda dev: dev.get_possible_actions(), devices))
 		
 
-class House(DeviceZone):
+class House(DeviceArea):
 	def __init__(self, repeater, layout):
 		super(House, self).__init__(self, None)
 		self.devices = {}
-		self.zones = {}
+		self.areas = {}
 		self.verbose = False
 		self.repeater = repeater
 		self.layout = layout
@@ -240,7 +240,7 @@ class House(DeviceZone):
 		# build house from layout
 		self.iid = -1
 		self.name = 'Global'
-		self.members = [DeviceZone(self, area) for area in layout.get_areas()]
+		self.members = [DeviceArea(self, area) for area in layout.get_areas()]
 
 	# public interface to clients
 	def set_verbose(self, verbose):
@@ -249,15 +249,15 @@ class House(DeviceZone):
 	def get_device_by_iid(self, iid):
 		return self.devices[iid]
 		
-	def get_devicezone_by_iid(self, iid):
-		return self.zones[iid]
+	def get_devicearea_by_iid(self, iid):
+		return self.areas[iid]
 
 	# private interface for owned objects to talk to repeater
 	def _register_device(self, device):
 		self.devices[device.iid] = device
 		
-	def _register_zone(self, zone):
-		self.zones[zone.iid] = zone
+	def _register_area(self, area):
+		self.areas[area.iid] = area
 
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)
