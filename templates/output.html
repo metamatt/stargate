@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{{ devtype }} details{% endblock title %}
+{% block title %}{{ devclass }} details{% endblock title %}
 {% block content %}
 
 <p>
-	Viewing 1 {{ devtype }} in
+	Viewing 1 {{ devclass }} in
 	area <a href="{{ url_for('enumerate_devices_by_area', iid = device.area.iid) }}">{{ device.area.name }}</a>
-	(<a href="{{ url_for('enumerate_' + devtype + 's_by_area', iid = device.area.iid) }}">view all {{ devtype }}s</a>):
+	(<a href="{{ url_for('enumerate_' + devclass + 's_by_area', iid = device.area.iid) }}">view all {{ devclass }}s</a>):
 	{% include 'inc/outputForm.html' %}
 </p>
 

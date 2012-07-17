@@ -2,12 +2,11 @@
 {% block title %}Overview{% endblock title %}
 {% block content %}
 
-{% set type_state_map = house.get_device_type_state_map() %}
-
 <p>
 	<a href="{{ url_for('enumerate_areas') }}">Areas</a>:
-	{% for type in type_state_map | order_states %}
-		{% set states = type_state_map[type] | order_states %}
+	{% set type_state_map = house.get_device_type_state_map(devclass = 'device') %}
+	{% for type in type_state_map | order_device_states(devclass = 'device') %}
+		{% set states = type_state_map[type] | order_device_states(devclass = 'device') %}
 		<a href="{{ url_for('enumerate_areas', filterlist = type) }}">{{ type }}</a>
 		{% if states|length %}({% endif %}
 		{% for state in states %}
@@ -19,13 +18,18 @@
 
 <p>
 <a href="{{ url_for('enumerate_controls') }}">Controls</a>:
-(keypad, pico, vcrx, etc?)
+{% set type_state_map = house.get_device_type_state_map(devclass = 'control') %}
+{% for type in type_state_map | order_device_states(devclass = 'control') %}
+	{% set states = type_state_map[type] | order_device_states(devclass = 'control') %}
+	<a href="{{ url_for('enumerate_controls', filterlist = type) }}">{{ type }}</a>
+{% endfor %}
 </p>
 
 <p>
 	<a href="{{ url_for('enumerate_outputs') }}">Outputs</a>:
-	{% for type in type_state_map | order_states %}
-		{% set states = type_state_map[type] | order_states %}
+	{% set type_state_map = house.get_device_type_state_map(devclass = 'output') %}
+	{% for type in type_state_map | order_device_states(devclass = 'output') %}
+		{% set states = type_state_map[type] | order_device_states(devclass = 'output') %}
 		<a href="{{ url_for('enumerate_outputs', filterlist = type) }}">{{ type }}</a>
 		{% if states|length %}({% endif %}
 		{% for state in states %}

@@ -10,6 +10,10 @@ class LutronDevice(object):
 	# and we will subclass as "OutputDevice") and inputs/controls (what Lutron calls an "input", I
 	# would typically call a "keypad", and we will subclass as "ControlDevice").
 
+	@staticmethod
+	def order_states(states):
+		return [state for state in (OutputDevice.KNOWN_STATES_IN_ORDER[:-1] + ControlDevice.KNOWN_STATES_IN_ORDER) if state in states]
+
 	house = None
 	area = None
 	iid = None
@@ -35,25 +39,24 @@ class LutronDevice(object):
 			return True
 		return False
 
-	# XXX how many of these belong here vs OutputDevice? Certainly not get_level
 	def get_current_states(self):
 		return [state for state in self.get_possible_states() if self.is_in_state(state)]
 
 	def get_possible_states(self):
 		if not self._possible_states:
-			self._possible_states = set([state for state in OutputDevice.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
+			self._possible_states = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
 		return self._possible_states
 
 	def get_possible_actions(self):
 		if not self._possible_actions:
-			self._possible_actions = set([state for state in OutputDevice.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
+			self._possible_actions = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
 		return self._possible_actions
 
 
 class OutputDevice(LutronDevice):
 	# Common device subclass for controllable outputs (lights, shades, appliances).
 
-	KNOWN_STATES_IN_ORDER = [ 'output', 'light', 'closed', 'off', 'half', 'on', 'shade', 'open', 'contactclosure', 'control', 'keypad', 'all' ]
+	KNOWN_STATES_IN_ORDER = [ 'light', 'closed', 'off', 'half', 'on', 'shade', 'open', 'contactclosure', 'all' ]
 	@staticmethod
 	def order_states(states):
 		return [state for state in OutputDevice.KNOWN_STATES_IN_ORDER if state in states]
@@ -171,6 +174,11 @@ def create_device_for_output(area, output_spec):
 class ControlDevice(LutronDevice):
 	# Common device subclass for controls (keypads, remotes, repeater/receiver buttons).
 
+	KNOWN_STATES_IN_ORDER = [ 'keypad', 'remote', 'repeater', 'all' ]
+	@staticmethod
+	def order_states(states):
+		return [state for state in ControlDevice.KNOWN_STATES_IN_ORDER if state in states]
+
 	def __init__(self, area, device_spec):
 		super(ControlDevice, self).__init__('control', area, device_spec.iid, device_spec.name)
 
@@ -219,11 +227,37 @@ class KeypadDevice(ControlDevice):
 		return self.buttons[button_cid]
 
 
+class RemoteKeypadDevice(KeypadDevice):
+	def __init__(self, area, device_spec):
+		super(RemoteKeypadDevice, self).__init__(area, device_spec)
+		self.devtype = 'remote'
+
+
+class RepeaterKeypadDevice(KeypadDevice):
+	def __init__(self, area, device_spec):
+		super(RepeaterKeypadDevice, self).__init__(area, device_spec)
+		self.devtype = 'repeater'
+
+
 def create_device_for_control(area, device_spec):
 	# Static factory for correct ControlDevice subclass matching Lutron DeviceType.
 	# Valid/known devicetypes: SEETOUCH_KEYPAD, SEETOUCH_TABLETOP_KEYPAD, SEETOUCH_HYBRID_KEYPAD,
 	# PICO_KEYPAD, VISOR_CONTROL_RECEIVER, MAIN_REPEATER. But they all just act like keypads.
-	cls = KeypadDevice
+	map_lutron_device_to_class = {
+		"SEETOUCH_KEYPAD": KeypadDevice,
+		"SEETOUCH_TABLETOP_KEYPAD": KeypadDevice,
+		"SEETOUCH_HYBRID_KEYPAD": KeypadDevice,
+		"PICO_KEYPAD": RemoteKeypadDevice,
+		"VISOR_CONTROL_RECEIVER": RepeaterKeypadDevice,
+		"MAIN_REPEATER": RepeaterKeypadDevice,
+	}
+
+	try:
+		cls = map_lutron_device_to_class[device_spec.get_type()]
+	except Exception as ex: # XXX fall back on default/generic case
+		print ex
+		cls = ControlDevice
+
 	return cls(area, device_spec)
 
 
@@ -258,11 +292,11 @@ class DeviceArea(object):
 		return any(dev.is_in_state(state) for dev in self.get_all_devices())
 
 	# interface to enumerate contained devices and areas
-	def get_all_devices(self, devclass = 'both'):
-		class_for_devclass = { 'in': ControlDevice, 'out': OutputDevice, 'both': LutronDevice }
+	def get_all_devices(self, devclass = 'device'):
+		class_for_devclass = { 'control': ControlDevice, 'output': OutputDevice, 'device': LutronDevice }
 		return self._children_of_class(class_for_devclass[devclass])
 
-	def get_devices_filtered_by(self, filters = [], devclass = 'both'):
+	def get_devices_filtered_by(self, filters = [], devclass = 'device'):
 		devs = self.get_all_devices(devclass)
 		for state in filters:
 			devs = filter(lambda dev: dev.is_in_state(state), devs)
@@ -277,9 +311,9 @@ class DeviceArea(object):
 			areas = filter(lambda area: area.has_device_in_state(state), areas)
 		return areas
 
-	def get_device_type_state_map(self):
+	def get_device_type_state_map(self, devclass = 'device'):
 		possible = { 'all': set() }
-		for dev in self.get_all_devices():
+		for dev in self.get_all_devices(devclass):
 			if not possible.has_key(dev.devtype):
 				possible[dev.devtype] = set()
 			possible[dev.devtype].update(dev.get_possible_states())

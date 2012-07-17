@@ -1,5 +1,6 @@
 matching filter:
 {% set filterscope = area if area else house %}
+{% set devclass = devclass if devclass else 'device' %}
 {% macro decorate_active(name) %}
 	{% if name in active_filters or (name == 'all' and active_filters == []) %}
 		<b>{{ name }}</b>
@@ -8,9 +9,9 @@ matching filter:
 	{% endif %}
 {% endmacro %}
 
-{% set type_state_map = filterscope.get_device_type_state_map() %}
-{% for type in type_state_map | order_states %}
-{% set states = type_state_map[type] | order_states %}
+{% set type_state_map = filterscope.get_device_type_state_map(devclass = devclass) %}
+{% for type in type_state_map | order_device_states(devclass = devclass) %}
+{% set states = type_state_map[type] | order_device_states(devclass = devclass) %}
 	{{ decorate_active(type) }}
 
 	{% if states|length %}({% endif %}

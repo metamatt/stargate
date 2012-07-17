@@ -1,20 +1,32 @@
-from flask import Flask, request, render_template, redirect, url_for
-from ra_house import OutputDevice
 import time
+
+from flask import Flask, request, render_template, redirect, url_for
+
+import ra_house
 
 app = Flask(__name__)
 house = None
 
-app.jinja_env.filters['order_states'] = OutputDevice.order_states
+def order_device_states(states, devclass = 'device'):
+	if devclass == 'output':
+		return ra_house.OutputDevice.order_states(states)
+	elif devclass == 'control':
+		return ra_house.ControlDevice.order_states(states)
+	else:
+		return ra_house.LutronDevice.order_states(states)
+app.jinja_env.filters['order_device_states'] = order_device_states
+
 
 @app.route('/')
 def root():
 	return render_template('index.html')
 
-@app.route('/controls/')
-def enumerate_controls():
-	controls = house.get_devices_filtered_by(devclass = 'in')
-	return render_template('outputList.html', devices = controls, devtype = 'control')
+@app.route('/controls/', defaults = {'filterlist': 'all'})
+@app.route('/controls/<filterlist>')
+def enumerate_controls(filterlist):
+	filters = filterlist.split(',')
+	controls = house.get_devices_filtered_by(filters, devclass = 'control')
+	return render_template('outputList.html', devices = controls, devclass = 'control', active_filters = filters)
 
 @app.route('/control/<int:iid>', methods = ['POST'])
 def activate_control(iid):
@@ -57,27 +69,27 @@ def activate_control_hack(iid, button_id, action):
 @app.route('/outputs/<filterlist>')
 def enumerate_outputs(filterlist):
 	filters = filterlist.split(',')
-	outputs = house.get_devices_filtered_by(filters, devclass = 'out')
-	return render_template('outputList.html', devices = outputs, devtype = 'output', active_filters = filters)
+	outputs = house.get_devices_filtered_by(filters, devclass = 'output')
+	return render_template('outputList.html', devices = outputs, devclass = 'output', active_filters = filters)
 
 # XXX should share code between these, type check, redirect to canonical url?
 @app.route('/control/<int:iid>')
 def get_control(iid):
 	# XXX should type check? share code?
 	control = house.get_device_by_iid(iid)
-	return render_template('output.html', device = control, devtype = 'control')
+	return render_template('output.html', device = control, devclass = 'control')
 
 @app.route('/device/<int:iid>')
 def get_device(iid):
 	device = house.get_device_by_iid(iid)
 	# XXX should type check and redirect?
-	return render_template('output.html', device = device, devtype = 'device')
+	return render_template('output.html', device = device, devclass = 'device')
 
 @app.route('/output/<int:iid>')
 def get_output(iid):
 	# XXX should type check? share code?
 	output = house.get_device_by_iid(iid)
-	return render_template('output.html', device = output, devtype = 'output')
+	return render_template('output.html', device = output, devclass = 'output')
 
 @app.route('/output/<int:iid>', methods = ['POST'])
 def set_output(iid):
@@ -119,16 +131,16 @@ def enumerate_areas(filterlist):
 def enumerate_outputs_by_area(iid, filterlist):
 	area = house.get_devicearea_by_iid(iid)
 	filters = filterlist.split(',')
-	outputs = area.get_devices_filtered_by(filters, devclass = 'out')
-	return render_template('outputList.html', area_filter = area, devices = outputs, devtype = 'output', active_filters = filters)
+	outputs = area.get_devices_filtered_by(filters, devclass = 'output')
+	return render_template('outputList.html', area_filter = area, devices = outputs, devclass = 'output', active_filters = filters)
 
 @app.route('/area/<int:iid>/controls/', defaults = {'filterlist': 'all'})
 @app.route('/area/<int:iid>/outputs/<filterlist>')
 def enumerate_controls_by_area(iid, filterlist):
 	area = house.get_devicearea_by_iid(iid)
 	filters = filterlist.split(',')
-	controls = area.get_devices_filtered_by(filters, devclass = 'in')
-	return render_template('outputList.html', area_filter = area, devices = controls, devtype = 'control', active_filters = filters)
+	controls = area.get_devices_filtered_by(filters, devclass = 'control')
+	return render_template('outputList.html', area_filter = area, devices = controls, devclass = 'control', active_filters = filters)
 
 @app.route('/area/<int:iid>/devices/', defaults = {'filterlist': 'all'})
 @app.route('/area/<int:iid>/devices/<filterlist>')
@@ -136,7 +148,7 @@ def enumerate_devices_by_area(iid, filterlist):
 	area = house.get_devicearea_by_iid(iid)
 	filters = filterlist.split(',')
 	devices = area.get_devices_filtered_by(filters)
-	return render_template('outputList.html', area_filter = area, devices = devices, devtype = 'device', active_filters = filters)
+	return render_template('outputList.html', area_filter = area, devices = devices, devclass = 'device', active_filters = filters)
 
 @app.context_processor
 def inject_house():
