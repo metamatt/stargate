@@ -1,7 +1,12 @@
 # This module handles the RadioRa2 project layout (from the configuration
 # software, and available from the repeater's web server as DbXmlInfo.xml),
-# and provides a high-level interface for working with its information in
-# a structured way: areas, loads, and keypads.
+# and provides a semi-high-level interface for working with its information
+# in a structured way: areas, outputs, and devices. (At this layer, we
+# continue to use Lutron terminology. "Devices" are input devices; mostly
+# keypads, and also the collections of buttons on things like the main
+# repeater and the visor control receiver; they're modeled as collections
+# of buttons and LEDs, and all cases I know about are equivalent to keypads,
+# but Lutron calls them "devices".)
 #
 # The idea here is that RaLayout and friends model things very close to
 # the way Lutron's XML file does. Then RaHouse can reinterpret and model
@@ -23,15 +28,25 @@ class LayoutBase(object):
 	def get_iid(self):
 		return self.iid
 
+
 class Area(LayoutBase):
-	# An Area also has a list of outputs.
-	# XXX and keypads, shade groups, any other components?
+	# An Area additionally has a list of outputs and a list of devices.
+	# XXX The Lutron XML file also includes information about device groups,
+	#     shade groups, and area nesting which we don't (currently) model.
 
 	outputs = None
+	devices = None
 
 	def __init__(self, iid, name):
 		super(Area, self).__init__(iid, name)
 		self.outputs = list()
+		self.devices = list()
+
+	@staticmethod
+	def from_xml(area_element):
+		area_name = area_element.attributes['Name'].value
+		area_iid = int(area_element.attributes['IntegrationID'].value)
+		return Area(area_iid, area_name)
 
 	def add_output(self, output):
 		self.outputs.append(output)
@@ -39,9 +54,16 @@ class Area(LayoutBase):
 	def get_outputs(self):
 		return self.outputs
 
+	def add_device(self, device):
+		self.devices.append(device)
+
+	def get_devices(self):
+		return self.devices
+
+
 class Output(LayoutBase):
-	# An Output has a type and lives in an area.
-	
+	# An Output additionally has an associated area and a type (shade, light, etc).
+
 	area = None
 	outputType = None
 
@@ -50,14 +72,78 @@ class Output(LayoutBase):
 		self.area = area
 		self.outputType = outputType
 		area.add_output(self)
+	
+	@staticmethod
+	def from_xml(output_element, area):
+		output_name = output_element.attributes['Name'].value
+		output_iid = int(output_element.attributes['IntegrationID'].value)
+		output_type = output_element.attributes['OutputType'].value
+		return Output(output_iid, output_name, output_type, area)
 
 	def get_type(self):
 		return self.outputType
 
-class Keypad(LayoutBase):
-	# Keypad: XXX placeholder
-	def __init__(self, iid, name):
-		super(Keypad, self).__init__(iid, name)
+
+class Device(LayoutBase):
+	# A Device additionally has an associated area and a type (pico, seetouch, etc),
+	# a list of buttons (actually a map from button id to label), and a list of LEDs.
+
+	area = None
+	deviceType = None
+	buttons = None
+	leds = None
+
+	def __init__(self, iid, name, deviceType, area):
+		super(Device, self).__init__(iid, name)
+		self.area = area
+		self.deviceType = deviceType
+		area.add_device(self)
+		self.buttons = dict()
+		self.leds = list()
+
+	@staticmethod
+	def from_xml(device_element, area):
+		def get_fixed_button_name(devtype, comp):
+			map = None
+			if devtype == 'PICO_KEYPAD': # up to 5 buttons, no engraving, relatively fixed function
+				map = { 2: 'Top', 3: 'Middle', 4: 'Bottom', 5: 'Raise', 6: 'Lower' }
+			elif devtype == 'SEETOUCH_TABLETOP_KEYPAD': # 1-3 sets of raise/lower buttons
+				map = { 20: 'Right column lower', 21: 'Right column raise', 22: 'Middle column lower', 23: 'Middle column raise',
+				        24: 'Left column lower', 25: 'Left column raise' }
+			elif devtype == 'SEETOUCH_KEYPAD' or devtype == 'HYBRID_SEETOUCH_KEYPAD': # 1 column, 0-2 sets of raise/lower buttons
+				map = { 16: 'Top lower', 17: 'Top raise', 18: 'Bottom lower', 19: 'Bottom raise' }
+			if map is not None and map.has_key(comp):
+				return '[%s]' % map[comp]
+			return None
+
+		device_name = device_element.attributes['Name'].value
+		device_iid = int(device_element.attributes['IntegrationID'].value)
+		device_type = device_element.attributes['DeviceType'].value
+		device = Device(device_iid, device_name, device_type, area)
+		for component_element in device_element.getElementsByTagName('Component'):
+			comp_number = int(component_element.attributes['ComponentNumber'].value)
+			comp_type = component_element.attributes['ComponentType'].value
+			if comp_type == 'BUTTON':
+				button_element = component_element.getElementsByTagName('Button')[0]
+				try:
+					label = button_element.attributes['Engraving'].value
+				except KeyError:
+					label = get_fixed_button_name(device_type, comp_number)
+					if not label:
+						label = button_element.attributes['Name'].value
+				device.buttons[comp_number] = label
+			elif comp_type == 'LED':
+				device.leds.append(comp_number)
+		return device
+
+	def get_type(self):
+		return self.deviceType
+	
+	def get_button_component_ids(self):
+		return self.buttons.keys()
+	
+	def get_led_component_ids(self):
+		return self.leds
 
 
 class RaLayout(object):
@@ -65,8 +151,8 @@ class RaLayout(object):
 	db_xml = None
 	areas = {} # map from iid (int) to object (Area)
 	outputs = {} # map from iid (int) to object (Output)
-	keypads = {}
-	
+	devices = {} # map from idd (int) to object (Device)
+
 	def read_cached_db(self, cacheFileName):
 		logging.info('Read DbXmlInfo from local file')
 		# XXX would be nice if we could just do a HEAD request, but the
@@ -75,7 +161,7 @@ class RaLayout(object):
 		# repeater.
 		cache = open('DbXmlInfo.xml')
 		self._setDbXml(cache.read())
-		
+
 	def _setDbXml(self, xmlData):
 		self.db_xml = xmlData
 		logging.info('Parse DbXmlInfo')
@@ -91,9 +177,9 @@ class RaLayout(object):
 
 	def map_db(self):
 		logging.info('Build map from DbXmlInfo')
-		for areaTag in self.db_dom.getElementsByTagName('Area'):
-			area_name = areaTag.attributes['Name'].value
-			if area_name == 'Root Area':
+		for area_element in self.db_dom.getElementsByTagName('Area'):
+			area = Area.from_xml(area_element)
+			if area.name == 'Root Area':
 				# I'm not sure what if anything I want to do with the root area --
 				# naive use of the DOM means it "contains" all the device groups and
 				# outputs, which is kinda true, but losing the info about how they
@@ -108,25 +194,39 @@ class RaLayout(object):
 				# areas contain areas, but not by flattening areas->outputs entirely
 				# the way the DOM getElementsByTagName does.
 				continue
-			area_iid = int(areaTag.attributes['IntegrationID'].value)
+			self._add_area(area)
 
-			area = self.areas[area_iid] = Area(area_iid, area_name)
+			for output_element in area_element.getElementsByTagName('Output'):
+				self._add_output(Output.from_xml(output_element, area))
 
-			for outputTag in areaTag.getElementsByTagName('Output'):
-				output_name = outputTag.attributes['Name'].value
-				output_iid = int(outputTag.attributes['IntegrationID'].value)
-				output_type = outputTag.attributes['OutputType'].value
-				self.outputs[output_iid] = Output(output_iid, output_name, output_type, area)
-			for deviceTag in areaTag.getElementsByTagName('Device'):
-				# TODO: extract info about keypads
-				pass
+			for device_element in area_element.getElementsByTagName('Device'):
+				self._add_device(Device.from_xml(device_element, area))
+				
 		logging.info('Done building DbXmlInfo map')
+
+	def _add_area(self, area):
+		self.areas[area.iid] = area
+
+	def _add_output(self, output):
+		self.outputs[output.iid] = output
+
+	def _add_device(self, device):
+		self.devices[device.iid] = device
 
 	def get_output_ids(self):
 		return self.outputs.keys()
-	
+
 	def get_outputs(self):
 		return self.outputs.values()
-	
+
+	def get_device_ids(self):
+		return self.devices.keys()
+
+	def get_devices(self):
+		return self.devices.values()
+
+	def get_device(self, iid):
+		return self.devices[iid]
+
 	def get_areas(self):
 		return self.areas.values()

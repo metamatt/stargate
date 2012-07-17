@@ -1,5 +1,5 @@
-{% set outputForm = 'output%d' % output.iid %}
-<form name="{{ outputForm }}" action="{{ url_for('set_output', iid = output.iid) }}" method="post">
+{% set outputForm = 'output%d' % device.iid %}
+<form name="{{ outputForm }}" action="{{ url_for('set_output', iid = device.iid) }}" method="post">
 	{% macro emit_set_to_level_link(name) -%}
 		<a href="#" onclick="document.{{ outputForm }}.elements['state'].value='level'; document.{{ outputForm }}.submit(); return false">{{ name }}</a>
 	{%- endmacro %}
@@ -9,12 +9,18 @@
 	
 	<input type="hidden" name="state" value="">
 
-	<a href="{{ url_for('get_output', iid = output.iid) }}">{{ output.name }}</a>: {{ output.get_level() }}
+	<a href="{{ url_for('get_' + device.devclass, iid = device.iid) }}">{{ device.name }}</a>
 	
-	{% for state in output.get_possible_actions() | order_states %}
+	{% if device.get_level %}
+		: {{ device.get_level() }}
+	{% endif %}
+	
+	{% for state in device.get_possible_actions() | order_states %}
 		| {{ emit_set_to_state_link(state) }}
 	{% endfor %}
 	
-	| <input type="range" name="level" min="0" max="100" step = "{{ output.level_step }}" value="{{ output.get_level() }}">
-	{{ emit_set_to_level_link('Set') }}
+	{% if device.set_level %}
+		| <input type="range" name="level" min="0" max="100" step = "{{ device.level_step }}" value="{{ device.get_level() }}">
+		{{ emit_set_to_level_link('Set') }}
+	{% endif %}
 </form>

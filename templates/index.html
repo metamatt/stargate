@@ -5,26 +5,31 @@
 {% set type_state_map = house.get_device_type_state_map() %}
 
 <p>
-	<a href="{{ url_for('enumerate_outputs') }}">Outputs:</a>
-	{% for type in type_state_map | order_states %}
-		{% set states = type_state_map[type] | order_states %}
-		<a href="{{ url_for('enumerate_outputs', filterlist = type) }}">{{ type }}</a>
-		{% if states|length %}({% endif %}
-		{% for state in states %}
-			<a href="{{ url_for('enumerate_outputs', filterlist = state) }}">{{ state }}</a>
-		{% endfor %}
-		{% if states|length %}){% endif %}
-	{% endfor %}
-</p>
-
-<p>
-	<a href="{{ url_for('enumerate_areas') }}">Areas:</a>
+	<a href="{{ url_for('enumerate_areas') }}">Areas</a>:
 	{% for type in type_state_map | order_states %}
 		{% set states = type_state_map[type] | order_states %}
 		<a href="{{ url_for('enumerate_areas', filterlist = type) }}">{{ type }}</a>
 		{% if states|length %}({% endif %}
 		{% for state in states %}
 			<a href="{{ url_for('enumerate_areas', filterlist = state) }}">{{ state }}</a>
+		{% endfor %}
+		{% if states|length %}){% endif %}
+	{% endfor %}
+</p>
+
+<p>
+<a href="{{ url_for('enumerate_controls') }}">Controls</a>:
+(keypad, pico, vcrx, etc?)
+</p>
+
+<p>
+	<a href="{{ url_for('enumerate_outputs') }}">Outputs</a>:
+	{% for type in type_state_map | order_states %}
+		{% set states = type_state_map[type] | order_states %}
+		<a href="{{ url_for('enumerate_outputs', filterlist = type) }}">{{ type }}</a>
+		{% if states|length %}({% endif %}
+		{% for state in states %}
+			<a href="{{ url_for('enumerate_outputs', filterlist = state) }}">{{ state }}</a>
 		{% endfor %}
 		{% if states|length %}){% endif %}
 	{% endfor %}

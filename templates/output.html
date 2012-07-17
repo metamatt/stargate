@@ -1,11 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Output details{% endblock title %}
+{% block title %}{{ devtype }} details{% endblock title %}
 {% block content %}
 
 <p>
-	Area <a href="{{ url_for('enumerate_outputs_by_area', iid = output.area.iid) }}">{{ output.area.name }}</a>:
+	Viewing 1 {{ devtype }} in
+	area <a href="{{ url_for('enumerate_devices_by_area', iid = device.area.iid) }}">{{ device.area.name }}</a>
+	(<a href="{{ url_for('enumerate_' + devtype + 's_by_area', iid = device.area.iid) }}">view all {{ devtype }}s</a>):
 	{% include 'inc/outputForm.html' %}
 </p>
 
+{% if device.get_button_ids %}
+	<ul>
+		{% for cid in device.get_button_ids() %}
+			<li>
+				{% set button = device.get_button(cid) %}
+				{% if button.has_led() %}
+					{{ '( O )' if button.get_led_state() else '( . )' }}
+				{% endif %}
+				<a href="{{ url_for('activate_control_hack', iid = device.iid, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).label }}</a>
+				{{ '(pressed)' if button.get_button_state() else '' }}
+			</li>
+		{% endfor %}
+	</ul>
+{% endif %}
+
+<p>
+	TBD: change history / statistics
+</p>
 
 {% endblock content %}

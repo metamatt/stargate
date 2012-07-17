@@ -13,8 +13,9 @@
     <div id="header">
 		{% block header %}
 			<h1><a href="{{ url_for('root') }}">Stargate</a></h1>
-			<a href="{{ url_for('enumerate_outputs') }}">Outputs</a>
 			<a href="{{ url_for('enumerate_areas') }}">Areas</a>
+			<a href="{{ url_for('enumerate_controls') }}">Controls</a>
+			<a href="{{ url_for('enumerate_outputs') }}">Outputs</a>
 		{% endblock header %}
 	</div>
     <div id="content">
