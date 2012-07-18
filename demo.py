@@ -154,12 +154,17 @@ def enumerate_devices_by_area(iid, filterlist):
 def inject_house():
 	return dict(house = house)
 
-def start(theHouse, debug = False):
-	# save repeater for handler classes to use
+def start(theHouse, port = None, public = False, webdebug = False):
+	# save house object for handler classes to use
 	global house
 	house = theHouse
 
 	# start webserver
-	if debug:
-		app.debug = True
-	app.run()
+	app_args = {}
+	if port:
+		app_args['port'] = port
+	if public:
+		app_args['host'] = '0.0.0.0'
+	if webdebug:
+		app_args['debug'] = True
+	app.run(**app_args)

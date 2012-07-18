@@ -1,3 +1,7 @@
+# (c) 2012 Matt Ginzton, matt@ginzton.net
+#
+# Control of Lutron RadioRa2 system.
+#
 # This module handles the RadioRa2 project layout (from the configuration
 # software, and available from the repeater's web server as DbXmlInfo.xml),
 # and provides a semi-high-level interface for working with its information
@@ -135,6 +139,10 @@ class Device(LayoutBase):
 			elif comp_type == 'LED':
 				device.leds.append(comp_number)
 		return device
+		
+	def ignore(self):
+		self.buttons = dict()
+		self.leds = list()
 
 	def get_type(self):
 		return self.deviceType
@@ -151,8 +159,12 @@ class RaLayout(object):
 	db_xml = None
 	areas = {} # map from iid (int) to object (Area)
 	outputs = {} # map from iid (int) to object (Output)
-	devices = {} # map from idd (int) to object (Device)
-
+	devices = {} # map from iid (int) to object (Device)
+	ignore_devices = None
+	
+	def __init__(self, ignore_devices = None):
+		self.ignore_devices = ignore_devices
+	
 	def read_cached_db(self, cacheFileName):
 		logging.info('Read DbXmlInfo from local file')
 		# XXX would be nice if we could just do a HEAD request, but the
@@ -211,6 +223,8 @@ class RaLayout(object):
 		self.outputs[output.iid] = output
 
 	def _add_device(self, device):
+		if device.iid in self.ignore_devices:
+			device.ignore()
 		self.devices[device.iid] = device
 
 	def get_output_ids(self):

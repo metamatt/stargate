@@ -9,54 +9,59 @@
 
 import logging
 import optparse
+import os
+import yaml
 
 import demo
 import ra_house
 import ra_layout
 import ra_repeater
 
-logging.basicConfig(format='%(asctime)s %(levelname)-8s: %(message)s',
-                    level = logging.DEBUG)
-
 
 if __name__ == '__main__':
-		# When invoked directly, parse the command line to find hostname and password,
-		# then connect, log in, and enter a monitoring loop which just prints system events
-		# until killed.
-		
 		# parse command line
 		p = optparse.OptionParser()
-		p.add_option('-H', '--hostname', default = 'lutron-radiora', help = 'network hostname for main repeater, default lutron-radiora')
-		p.add_option('-U', '--username', default = 'lutron', help = 'username for repeater telnet login')
-		p.add_option('-P', '--password', default = 'integration', help = 'password for repeater telnet login')
-		p.add_option('-V', '--verbose', action = 'store_true', help = 'enable debug output')
-		p.add_option('-C', '--dbcache', help = 'local path to cached DbXmlInfo.xml to use, instead of retrieving it from repeater')
-		p.add_option('-D', '--debug', action = 'store_true', help = 'enable Flask debugger')
-		p.add_option('-S', '--startserver', action = 'store_true', help = 'run webserver mode')
+		p.add_option('-c', '--config', default = 'config.yaml', help = 'configuration file')
 		(options, args) = p.parse_args()
 		
+		# read yaml config file
+		config_file = open(options.config)
+		config = yaml.safe_load(config_file)
+		config_file.close()
+		
+		# initialize logging
+		loglevel_str = config['logging']['loglevel']
+		loglevel = getattr(logging, loglevel_str.upper(), None)
+		if not isinstance(loglevel, int):
+			raise ValueError('Invalid log level: %s' % loglevel_str)
+		logfile_formatstr = config['logging']['logfile']
+		logfile_params = { 'pid': os.getpid() }
+		logfile = logfile_formatstr % logfile_params
+		logger = logging.getLogger()
+		logger.setLevel(loglevel)
+		log_formatter = logging.Formatter('%(asctime)s %(threadName)-12s %(levelname)-8s: %(message)s')
+		file_loghandler = logging.FileHandler(logfile)
+		file_loghandler.setLevel(loglevel)
+		file_loghandler.setFormatter(log_formatter)
+		logger.addHandler(file_loghandler)
+		console_loghandler = logging.StreamHandler()
+		console_loghandler.setLevel(logging.INFO)
+		console_loghandler.setFormatter(log_formatter)
+		logger.addHandler(console_loghandler)
+		
 		# connect and log in
-		layout = ra_layout.RaLayout()
-		if options.dbcache:
-			layout.read_cached_db(options.dbcache)
+		repeater_config = config['repeater']
+		layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
+		if repeater_config.has_key('cached_database'):
+			layout.read_cached_db(repeater_config['cached_database'])
 		else:
-			layout.get_live_db(options.hostname)
+			layout.get_live_db(repeater_config['hostname'])
 		layout.map_db()
 
 		repeater = ra_repeater.RaRepeater()
-		if options.verbose:
-			repeater.set_verbose(True)
-		repeater.connect(options.hostname, options.username, options.password)
+		repeater.connect(repeater_config['hostname'], repeater_config['username'], repeater_config['password'])
 		
 		house = ra_house.House(repeater, layout)
-		if options.verbose:
-			house.set_verbose(True)
 
-		# Canned/hardcoded demos for testing
-		#r.enable_monitoring()
-		#r.dump_all_levels()
-		#r.room_to('11', 75)
-		#r.dump_all_on()
-
-		if options.startserver:
-			demo.start(house, options.debug)
+		# run the web app
+		demo.start(house, **config['server'])

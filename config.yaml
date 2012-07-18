@@ -1,0 +1,17 @@
+repeater:
+    hostname: lutron-radiora
+    username: stargate
+    password: stargate
+    cached_database: DbXmlInfo.xml
+
+    layout:
+        ignore_keypads: [1]
+
+logging:
+    loglevel: debug
+    logfile: stargate.log # stargate-%(pid)d.log
+
+server:
+    port: 5000
+    public: True
+    webdebug: true

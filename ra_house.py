@@ -1,8 +1,16 @@
 # (c) 2012 Matt Ginzton, matt@ginzton.net
 #
-# High-level interface to Lutron RadioRa2 system.
+# Control of Lutron RadioRa2 system.
+#
+# This module provides high-level objects representing the various
+# RadioRa2 devices.
+
+import logging
 
 import ra_repeater
+
+
+logger = logging.getLogger()
 
 
 class LutronDevice(object):
@@ -164,8 +172,8 @@ def create_device_for_output(area, output_spec):
 	
 	try:
 		cls = map_lutron_output_to_class[output_spec.get_type()]
-	except Exception as ex: # XXX fall back on default/generic case
-		print ex
+	except: # XXX fall back on default/generic case
+		logger.error('unknown lutron device type: %s' % device_spec.get_type())
 		cls = OutputDevice
 
 	return cls(area, output_spec)
@@ -241,12 +249,10 @@ class RepeaterKeypadDevice(KeypadDevice):
 
 def create_device_for_control(area, device_spec):
 	# Static factory for correct ControlDevice subclass matching Lutron DeviceType.
-	# Valid/known devicetypes: SEETOUCH_KEYPAD, SEETOUCH_TABLETOP_KEYPAD, SEETOUCH_HYBRID_KEYPAD,
-	# PICO_KEYPAD, VISOR_CONTROL_RECEIVER, MAIN_REPEATER. But they all just act like keypads.
 	map_lutron_device_to_class = {
 		"SEETOUCH_KEYPAD": KeypadDevice,
 		"SEETOUCH_TABLETOP_KEYPAD": KeypadDevice,
-		"SEETOUCH_HYBRID_KEYPAD": KeypadDevice,
+		"HYBRID_SEETOUCH_KEYPAD": KeypadDevice,
 		"PICO_KEYPAD": RemoteKeypadDevice,
 		"VISOR_CONTROL_RECEIVER": RepeaterKeypadDevice,
 		"MAIN_REPEATER": RepeaterKeypadDevice,
@@ -254,8 +260,8 @@ def create_device_for_control(area, device_spec):
 
 	try:
 		cls = map_lutron_device_to_class[device_spec.get_type()]
-	except Exception as ex: # XXX fall back on default/generic case
-		print ex
+	except: # XXX fall back on default/generic case
+		logger.error('unknown lutron device type: %s' % device_spec.get_type())
 		cls = ControlDevice
 
 	return cls(area, device_spec)
@@ -329,7 +335,6 @@ class House(DeviceArea):
 		super(House, self).__init__(self, None)
 		self.devices = {}
 		self.areas = {}
-		self.verbose = False
 		self.repeater = repeater
 		self.layout = layout
 
@@ -348,9 +353,6 @@ class House(DeviceArea):
 		self.members = [DeviceArea(self, area_spec) for area_spec in layout.get_areas()]
 
 	# public interface to clients
-	def set_verbose(self, verbose):
-		self.verbose = verbose
-
 	def get_device_by_iid(self, iid):
 		return self.devices[iid]
 

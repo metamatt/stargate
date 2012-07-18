@@ -1,8 +1,6 @@
-# This module handles the TCP connection to the repeater,
-# and provides an interface for getting/setting load status
-# and sending commands to/from Ra2 devices.
+# (c) 2012 Matt Ginzton, matt@ginzton.net
 #
-# Rewrite in progress, after which, this should say:
+# Control of Lutron RadioRa2 system.
 #
 # This module handles the TCP connection to the repeater,
 # and listens to it in monitor mode to build a cache of
@@ -10,11 +8,14 @@
 # interface for querying and changing the state of outputs
 # and devices.
 
+import logging
 import re
 import select
 import socket
 import time
 import threading
+
+logger = logging.getLogger()
 
 # states we recognize in repeater listener
 STATE_FRESH_CONNECTION, STATE_PROCESSING, STATE_WANT_LOGIN, STATE_WANT_PASSWORD, STATE_READY = range(5)
@@ -44,7 +45,7 @@ class OutputCache(object):
 
 	def record_output_level(self, output_iid, level):
 		# should be called only by RaRepeater.repeaterReply()
-		print "record_output_level: output %d level %d" % (output_iid, level)
+		logger.info('record_output_level: output %d level %d' % (output_iid, level))
 		self.output_levels[output_iid] = level
 
 	def get_output_level(self, output_iid):
@@ -57,7 +58,7 @@ class OutputCache(object):
 
 	def record_button_state(self, device_iid, button_cid, state):
 		# should be called only by RaRepeater.repeaterReply()
-		print "record_button_state: device %d button %d state %d" % (device_iid, button_cid, state)
+		logger.info('record_button_state: device %d button %d state %d' % (device_iid, button_cid, state))
 		self.button_states[device_iid][button_cid] = state
 
 	def get_button_state(self, device_iid, button_cid):
@@ -70,7 +71,7 @@ class OutputCache(object):
 
 	def record_led_state(self, device_iid, led_cid, state):
 		# should be called only by RaRepeater.repeaterReply()
-		print "record_led_state: device %d led %d state %d" % (device_iid, led_cid, state)
+		logger.info('record_led_state: device %d led %d state %d' % (device_iid, led_cid, state))
 		self.led_states[device_iid][led_cid] = state
 
 	def get_led_state(self, device_iid, led_cid):
@@ -114,11 +115,7 @@ class RaRepeater(object):
 	cache = None
 	
 	def __init__(self):
-		self.verbose = False
 		self._prep_response_handlers()
-	
-	def set_verbose(self, verbosity):
-		self.verbose = verbosity
 	
 	def reset_cache(self, cache):
 		self.cache = cache
@@ -164,21 +161,20 @@ class RaRepeater(object):
 
 	def repeaterCommand(self, cmd):
 		self._setState(STATE_PROCESSING)
-		if self.verbose:
-			print 'debug: send %s' % repr(cmd)
+		logger.debug('repeaterCommand: send %s' % repr(cmd))
 		self.socket.send(cmd + CRLF)
 
 	def _match_output_response(self, match):
 		output = int(match.group(1))
 		level = float(match.group(2))
-		print "match %s -> output %d set level %g" % (match.group(), output, level)
+		logger.debug('match %s -> output %d set level %g' % (match.group(), output, level))
 		self.cache.record_output_level(output, level)
 
 	def _match_button_response(self, match):
 		device = int(match.group(1))
 		component = int(match.group(2))
 		action = int(match.group(3))
-		print "match %s -> device %d button %d action %d" % (match.group(), device, component, action)
+		logger.debug('match %s -> device %d button %d action %d' % (match.group(), device, component, action))
 		state = True if action == 3 else False
 		self.cache.record_button_state(device, component, state)
 
@@ -186,7 +182,7 @@ class RaRepeater(object):
 		device = int(match.group(1))
 		component = int(match.group(2))
 		parameter = int(match.group(3))
-		print "match %s -> device %d led %d to %d" % (match.group(), device, component, parameter)
+		logger.debug('match %s -> device %d led %d to %d' % (match.group(), device, component, parameter))
 		# XXX doesn't handle LED flashing state
 		state = True if parameter == 1 else False
 		self.cache.record_led_state(device, component, state)
@@ -199,8 +195,7 @@ class RaRepeater(object):
 		]
 
 	def repeaterReply(self, line):
-		if self.verbose:
-			print 'debug: reply %s' % repr(line)
+		logger.debug('repeaterReply: reply %s' % repr(line))
 		if line == 'GNET> ':
 			self._setState(STATE_READY)
 		elif line == 'login: ':
@@ -224,12 +219,11 @@ class RaRepeater(object):
 			daemon = True
 
 			def __init__(self, repeater):
-				super(RepeaterListener, self).__init__()
+				super(RepeaterListener, self).__init__(name = 'ra_repeater')
 				self.repeater = repeater
 
 			def run(self):
 				sock = self.repeater.socket
-				verbose = self.repeater.verbose and False
 				unprocessed = ''
 
 				while True:
@@ -238,17 +232,14 @@ class RaRepeater(object):
 					# - append new data to 'unprocessed'
 					# - if 'unprocessed' contains any complete lines of input,
 					#   send them over to main thread
-					if verbose:
-						print 'debug: listener thread block on input'
+					logger.debug('debug: listener thread block on input')
 					(readable, writable, errored) = select.select([sock], [], [])
-					if verbose:
-						print 'debug: listener thread woke for input'
+					logger.debug('debug: listener thread woke for input')
 					assert readable == [sock]
 					newInput = sock.recv(1024)
 					# XXX: I don't know what embedded NUL bytes mean (e.g. after GNET prompt), but ignore them.
 					newInput = newInput.replace('\x00', '')
-					if verbose:
-						print 'debug: listener thread read %d bytes: "%s"' % (len(newInput), repr(newInput))
+					logger.debug('debug: listener thread read %d bytes: "%s"' % (len(newInput), repr(newInput)))
 					unprocessed += newInput
 					lines = unprocessed.split(CRLF)
 					if lines[-1] in ra_prompts:
@@ -263,22 +254,18 @@ class RaRepeater(object):
 		self.listener.start()
 	
 	def _setState(self, state):
-		if self.verbose:
-			print 'debug: state now %d' % state
+		logger.debug('debug: state now %d' % state)
 		self.state = state
 		# wake anyone waiting for this state change
 		self.stateEvent.set()
 
 	def waitForState(self, state):
-		if self.verbose:
-			print 'debug: want state %d' % state
+		logger.debug('debug: want state %d' % state)
 		while self.state != state:
 			self.stateEvent.clear()
 			if self.state == state:
-				print 'hahahaha!'
+				logger.debug('debug: found requested state')
 				break
-			if self.verbose:
-				print 'debug: wait for state change (now %d)' % self.state
+			logger.debug('debug: wait for state change (now %d)' % self.state)
 			self.stateEvent.wait()
-		if self.verbose:
-			print 'debug: state wait satisfied'
+		logger.debug('debug: state wait satisfied')
