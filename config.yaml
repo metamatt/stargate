@@ -8,10 +8,13 @@ repeater:
         ignore_keypads: [1]
 
 logging:
-    loglevel: debug
     logfile: stargate.log # stargate-%(pid)d.log
+    console_level: info
+    level: debug
+    level.ra_repeater: debug
+    level.ra_repeater.transport: debug
 
 server:
     port: 5000
-    public: True
+    public: false
     webdebug: true

@@ -10,7 +10,7 @@ import logging
 import ra_repeater
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class LutronDevice(object):

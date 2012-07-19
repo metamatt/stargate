@@ -15,13 +15,15 @@ import socket
 import time
 import threading
 
-logger = logging.getLogger()
+
+logger = logging.getLogger(__name__)
 
 # states we recognize in repeater listener
 STATE_FRESH_CONNECTION, STATE_PROCESSING, STATE_WANT_LOGIN, STATE_WANT_PASSWORD, STATE_READY = range(5)
 # repeater responses that are all she wrote, and won't be followed by CRLF
 ra_prompts = set(['login: ', 'password: ', 'GNET> '])
 CRLF = '\r\n'
+
 
 class OutputCache(object):
 	# Low-level cache of last seen level for each device (output, button, led)
@@ -162,7 +164,9 @@ class RaRepeater(object):
 	def repeaterCommand(self, cmd):
 		self._setState(STATE_PROCESSING)
 		logger.debug('repeaterCommand: send %s' % repr(cmd))
-		self.socket.send(cmd + CRLF)
+		sent = self.socket.send(cmd + CRLF)
+		if sent != len(cmd) + 2:
+			logger.warning('repeaterCommand: sent %d of %d bytes' % (sent, 2 + len(cmd)))
 
 	def _match_output_response(self, match):
 		output = int(match.group(1))
@@ -196,24 +200,29 @@ class RaRepeater(object):
 
 	def repeaterReply(self, line):
 		logger.debug('repeaterReply: reply %s' % repr(line))
+		# handle prompts as state transitions
 		if line == 'GNET> ':
 			self._setState(STATE_READY)
 		elif line == 'login: ':
 			self._setState(STATE_WANT_LOGIN)
 		elif line == 'password: ':
 			self._setState(STATE_WANT_PASSWORD)
-
-		# TODO: more substantive processing of real commands
-		# - should cache value for future gets (DONE)
-		# - should handle output, led, and button (DONE)
-		# - should announce this happened for historical logging
-		for (pattern, handler) in self.response_handler_list:
-			match = pattern.search(line) # XXX: should use match instead of search, but need to figure out the \rGNET issue
-			if match:
-				handler(match)
-				break
+		else:
+			# otherwise, try to parse as monitoring response
+			# TODO: more substantive processing of real commands
+			# - should cache value for future gets (DONE)
+			# - should handle output, led, and button (DONE)
+			# - should announce this happened for historical logging
+			for (pattern, handler) in self.response_handler_list:
+				match = pattern.search(line) # XXX: should use match instead of search, but need to figure out the \rGNET issue
+				if match:
+					handler(match)
+					break
+			if not match:
+				logger.warning('unmatched repeater reply: %s' % repr(line))
 
 	def startListenThread(self):
+		logger = logging.getLogger(__name__ + '.listener')
 		class RepeaterListener(threading.Thread):
 			repeater = None
 			daemon = True
@@ -226,28 +235,38 @@ class RaRepeater(object):
 				sock = self.repeater.socket
 				unprocessed = ''
 
-				while True:
-					# Run loop:
-					# - block until socket is readable, then read whatever we can
-					# - append new data to 'unprocessed'
-					# - if 'unprocessed' contains any complete lines of input,
-					#   send them over to main thread
-					logger.debug('debug: listener thread block on input')
-					(readable, writable, errored) = select.select([sock], [], [])
-					logger.debug('debug: listener thread woke for input')
-					assert readable == [sock]
-					newInput = sock.recv(1024)
-					# XXX: I don't know what embedded NUL bytes mean (e.g. after GNET prompt), but ignore them.
-					newInput = newInput.replace('\x00', '')
-					logger.debug('debug: listener thread read %d bytes: "%s"' % (len(newInput), repr(newInput)))
-					unprocessed += newInput
-					lines = unprocessed.split(CRLF)
-					if lines[-1] in ra_prompts:
-						unprocessed = ''
-					else:
-						unprocessed = lines.pop()
-					for line in lines:
-						self.repeater.repeaterReply(line)
+				try:
+					while True:
+						# Run loop:
+						# - block until socket is readable, then read whatever we can
+						# - append new data to 'unprocessed'
+						# - if 'unprocessed' contains any complete lines of input,
+						#   send them over to main thread
+						logger.debug('debug: listener thread block on input')
+						(readable, writable, errored) = select.select([sock], [], [sock])
+						logger.debug('debug: listener thread woke for input with %d/%d/%d sockets r/w/e' % (len(readable), len(writable), len(errored)))
+						assert readable == [sock]
+						newInput = sock.recv(1024)
+						logger.debug('debug: listener thread read %d bytes: %s' % (len(newInput), repr(newInput)))
+						if len(newInput) == 0:
+							raise Exception('repeater closed socket')
+						# XXX: I don't know what embedded NUL bytes mean (e.g. after GNET prompt), but ignore them.
+						newInput = newInput.replace('\x00', '')
+						# Now combine and parse pending data (new and old-unprocessed). Append new data,
+						# split into lines, and if the last line is a prompt, stick it back in the
+						# pending pile.
+						unprocessed += newInput
+						lines = unprocessed.split(CRLF)
+						if lines[-1] in ra_prompts:
+							unprocessed = ''
+						else:
+							unprocessed = lines.pop()
+						# Now send complete received lines of data back to main thread for processing.
+						for line in lines:
+							self.repeater.repeaterReply(line)
+				except:
+					logger.exception('repeater listener died')
+					# XXX should reconnect...
 
 		self.stateEvent = threading.Event()
 		self.listener = RepeaterListener(self)

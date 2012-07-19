@@ -20,6 +20,10 @@ import httplib
 import logging
 import xml.dom.minidom
 
+
+logger = logging.getLogger(__name__)
+
+
 class LayoutBase(object):
 	# Everything in a RaLayout has an iid and a name.
 	def __init__(self, iid, name):
@@ -166,7 +170,7 @@ class RaLayout(object):
 		self.ignore_devices = ignore_devices
 	
 	def read_cached_db(self, cacheFileName):
-		logging.info('Read DbXmlInfo from local file')
+		logger.info('Read DbXmlInfo from local file')
 		# XXX would be nice if we could just do a HEAD request, but the
 		# repeater's HTTP server doesn't respond to that. TBD how we
 		# figure out when to cache, and when to get the file from the
@@ -176,19 +180,19 @@ class RaLayout(object):
 
 	def _setDbXml(self, xmlData):
 		self.db_xml = xmlData
-		logging.info('Parse DbXmlInfo')
+		logger.info('Parse DbXmlInfo')
 		self.db_dom = xml.dom.minidom.parseString(self.db_xml)
-		logging.info('Done parsing DbXmlInfo')
+		logger.info('Done parsing DbXmlInfo')
 
 	def get_live_db(self, hostname):
-		logging.info('Read DbXmlInfo from repeater')
+		logger.info('Read DbXmlInfo from repeater')
 		conn = httplib.HTTPConnection(hostname, 80)
 		conn.request('GET', '/DbXmlInfo.xml')
 		response = conn.getresponse()
 		self._setDbXml(response.read())
 
 	def map_db(self):
-		logging.info('Build map from DbXmlInfo')
+		logger.info('Build map from DbXmlInfo')
 		for area_element in self.db_dom.getElementsByTagName('Area'):
 			area = Area.from_xml(area_element)
 			if area.name == 'Root Area':
@@ -214,7 +218,7 @@ class RaLayout(object):
 			for device_element in area_element.getElementsByTagName('Device'):
 				self._add_device(Device.from_xml(device_element, area))
 				
-		logging.info('Done building DbXmlInfo map')
+		logger.info('Done building DbXmlInfo map')
 
 	def _add_area(self, area):
 		self.areas[area.iid] = area
