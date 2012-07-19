@@ -20,8 +20,16 @@ logger = logging.getLogger(__name__)
 
 # states we recognize in repeater listener
 STATE_FRESH_CONNECTION, STATE_PROCESSING, STATE_WANT_LOGIN, STATE_WANT_PASSWORD, STATE_READY = range(5)
-# repeater responses that are all she wrote, and won't be followed by CRLF
-ra_prompts = set(['login: ', 'password: ', 'GNET> '])
+# Map of repeater prompts to the states they indicate. We define "prompt" as the repeater responses
+# that mean the repeater wants to hear from us next, and won't be followed by CRLF.
+ra_prompt_map = {
+	'login: ': STATE_WANT_LOGIN,
+	'password: ': STATE_WANT_PASSWORD,
+	'GNET> \x00': STATE_READY, # XXX I don't know why, but the first GNET response after login always has a NUL byte there
+	'\rGNET> ': STATE_READY, # XXX note that the first GNET response is preceded by \r\n which we split on the line separator
+	# so we don't treat it as part of the response, but all further GNET responses have only \r which we don't split out
+	# and thus do see.
+}
 CRLF = '\r\n'
 
 
@@ -200,21 +208,22 @@ class RaRepeater(object):
 
 	def repeaterReply(self, line):
 		logger.debug('repeaterReply: reply %s' % repr(line))
-		# handle prompts as state transitions
-		if line == 'GNET> ':
-			self._setState(STATE_READY)
-		elif line == 'login: ':
-			self._setState(STATE_WANT_LOGIN)
-		elif line == 'password: ':
-			self._setState(STATE_WANT_PASSWORD)
-		else:
-			# otherwise, try to parse as monitoring response
+		# Handle prompts as state transitions. These can occur on a line by themself, or as the
+		# prefix of a line containing additional data. So we look for the prompt as a prefix,
+		# if found act on it and strip it off, then continue handling the rest of hte line.
+		for prompt in ra_prompt_map:
+			if line.startswith(prompt):
+				self._setState(ra_prompt_map[prompt])
+				line = line[len(prompt):]
+
+		if len(line) > 0:
+			# Try to parse remainder as monitoring response
 			# TODO: more substantive processing of real commands
 			# - should cache value for future gets (DONE)
 			# - should handle output, led, and button (DONE)
 			# - should announce this happened for historical logging
 			for (pattern, handler) in self.response_handler_list:
-				match = pattern.search(line) # XXX: should use match instead of search, but need to figure out the \rGNET issue
+				match = pattern.match(line)
 				if match:
 					handler(match)
 					break
@@ -250,16 +259,16 @@ class RaRepeater(object):
 						logger.debug('debug: listener thread read %d bytes: %s' % (len(newInput), repr(newInput)))
 						if len(newInput) == 0:
 							raise Exception('repeater closed socket')
-						# XXX: I don't know what embedded NUL bytes mean (e.g. after GNET prompt), but ignore them.
-						newInput = newInput.replace('\x00', '')
 						# Now combine and parse pending data (new and old-unprocessed). Append new data,
-						# split into lines, and if the last line is a prompt, stick it back in the
-						# pending pile.
+						# split into lines, and if the last line is not a known prompt, stick it back in
+						# the pending pile. (We expect all replies to eventually go back to the GNET
+						# prompt, so if we read a response that doesn't end with a prompt, we don't know
+						# whether it's complete, and we do know more data is coming, so we wait for more
+						# before deciding how to parse this.)
 						unprocessed += newInput
 						lines = unprocessed.split(CRLF)
-						if lines[-1] in ra_prompts:
-							unprocessed = ''
-						else:
+						unprocessed = ''
+						if lines[-1] not in ra_prompt_map:
 							unprocessed = lines.pop()
 						# Now send complete received lines of data back to main thread for processing.
 						for line in lines:

@@ -12,7 +12,7 @@ logging:
     console_level: info
     level: debug
     level.ra_repeater: debug
-    level.ra_repeater.transport: debug
+    level.ra_repeater.listener: info
 
 server:
     port: 5000
