@@ -17,12 +17,15 @@
 </p>
 
 <p>
-<a href="{{ url_for('enumerate_controls') }}">Controls</a>:
-{% set type_state_map = house.get_device_type_state_map(devclass = 'control') %}
-{% for type in type_state_map | order_device_states(devclass = 'control') %}
-	{% set states = type_state_map[type] | order_device_states(devclass = 'control') %}
-	<a href="{{ url_for('enumerate_controls', filterlist = type) }}">{{ type }}</a>
-{% endfor %}
+	<a href="{{ url_for('enumerate_controls') }}">Controls</a>:
+	{% set type_state_map = house.get_device_type_state_map(devclass = 'control') %}
+	{% for type in type_state_map | order_device_states(devclass = 'control') %}
+		{% set states = type_state_map[type] | order_device_states(devclass = 'control') %}
+		<a href="{{ url_for('enumerate_controls', filterlist = type) }}">{{ type }}</a>
+	{% endfor %}
+	| used in last
+	  <a href="{{ url_for('enumerate_controls', filterlist = 'age=3600') }}">hour</a>
+	  <a href="{{ url_for('enumerate_controls', filterlist = 'age=86400') }}">day</a>
 </p>
 
 <p>
@@ -37,6 +40,9 @@
 		{% endfor %}
 		{% if states|length %}){% endif %}
 	{% endfor %}
+	| used in last
+	  <a href="{{ url_for('enumerate_outputs', filterlist = 'age=3600') }}">hour</a>
+	  <a href="{{ url_for('enumerate_outputs', filterlist = 'age=86400') }}">day</a>
 </p>
 
 {% endblock content %}

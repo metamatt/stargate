@@ -43,9 +43,15 @@ class LutronDevice(object):
 		self.house._register_device(self)
 
 	def is_in_state(self, state):
+		# special case "age=NNN"
+		if state[:4] == 'age=':
+			age = int(state[4:])
+			return self.get_age() < age
+		# look for handler named after state
 		handler = 'is_' + state
 		if hasattr(self, handler):
 			return getattr(self, handler)()
+		# default answer based on class/type
 		if state == 'all' or state == self.devclass or state == self.devtype:
 			return True
 		return False
@@ -68,7 +74,10 @@ class LutronDevice(object):
 		self.last_action_time = time.time()
 		
 	def get_age(self):
-		age_secs = time.time() - (self.last_action_time if self.last_action_time else 0)
+		return time.time() - (self.last_action_time if self.last_action_time else 0)
+
+	def get_recent_use_estimate(self):
+		age_secs = self.get_age()
 		if age_secs > 24 * 3600:
 			return None
 		elif age_secs > 3600:
