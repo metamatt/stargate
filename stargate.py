@@ -68,21 +68,28 @@ if __name__ == '__main__':
 			module_logger.setLevel(module_loglevel)
 	
 	# connect and log in
-	repeater_config = config['repeater']
-	layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
-	if repeater_config.has_key('cached_database'):
-		layout.read_cached_db(repeater_config['cached_database'])
+	# XXX: Werkzeug/Flask has a debugger with a reloader feature which if
+	# enabled will cause it to immediately respawn another copy of this process;
+	# the upshot is all this code runs twice and we only want it to run once.
+	# Figure out if we're the parent process which will exist only to watch over
+	# reloadable children, and if so, avoid any heavy lifting.
+	if config['server']['webdebug'] and not os.environ.get('WERKZEUG_RUN_MAIN'):
+		logger.warning('startup: pid %d is the werkzeug reloader' % os.getpid())
+		house = None
 	else:
-		layout.get_live_db(repeater_config['hostname'])
-	layout.map_db()
+		logger.warning('startup: pid %d is the active werkzeug' % os.getpid())
+		repeater_config = config['repeater']
+		layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
+		if repeater_config.has_key('cached_database'):
+			layout.read_cached_db(repeater_config['cached_database'])
+		else:
+			layout.get_live_db(repeater_config['hostname'])
+		layout.map_db()
 
-	repeater = ra_repeater.RaRepeater()
-	repeater.connect(repeater_config['hostname'], repeater_config['username'], repeater_config['password'])
+		repeater = ra_repeater.RaRepeater()
+		repeater.connect(repeater_config['hostname'], repeater_config['username'], repeater_config['password'])
 	
-	house = ra_house.House(repeater, layout)
+		house = ra_house.House(repeater, layout)
 
 	# run the web app
-	# XXX flask re-invokes another copy of the app (maybe to support forking debugger?)
-	# -- this causes another connection to the repeater -- I think we need to move the
-	# startup code into the web app, instead of doing a bunch of stuff before demo.start().
 	demo.start(house, **config['server'])
