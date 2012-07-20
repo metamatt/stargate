@@ -9,7 +9,7 @@ repeater:
 
 logging:
     logfile: stargate.log # stargate-%(pid)d.log
-    console_level: info
+    console_level: warning
     level: debug
     level.ra_repeater: debug
     level.ra_repeater.listener: info

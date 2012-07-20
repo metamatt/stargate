@@ -6,6 +6,7 @@
 # RadioRa2 devices.
 
 import logging
+import time
 
 import ra_repeater
 
@@ -28,6 +29,8 @@ class LutronDevice(object):
 	name = None
 	devclass = None
 	devtype = None
+	last_action_time = None
+	action_count = 0
 	
 	def __init__(self, devclass, area, iid, name):
 		self.devclass = devclass
@@ -59,6 +62,22 @@ class LutronDevice(object):
 		if not self._possible_actions:
 			self._possible_actions = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
 		return self._possible_actions
+	
+	def on_user_action(self):
+		self.action_count += 1
+		self.last_action_time = time.time()
+		
+	def get_age(self):
+		age_secs = time.time() - (self.last_action_time if self.last_action_time else 0)
+		if age_secs > 24 * 3600:
+			return None
+		elif age_secs > 3600:
+			(count, unit) = (age_secs // 3600, 'hour')
+		elif age_secs > 60:
+			(count, unit) = (age_secs // 60, 'minute')
+		else:
+			(count, unit) = (int(age_secs), 'second')
+		return '%d %s%s ago' % (count, unit, 's' if count != 1 else '')
 
 
 class OutputDevice(LutronDevice):
@@ -345,7 +364,8 @@ class House(DeviceArea):
 		for iid in layout.get_device_ids():
 			device = layout.get_device(iid)
 			cache.watch_device(iid, device.get_button_component_ids(), device.get_led_component_ids())
-		repeater.reset_cache(cache)
+		cache.subscribe_to_actions(self)
+		repeater.bind_cache(cache)
 		
 		# build house from layout
 		self.iid = -1
@@ -354,10 +374,17 @@ class House(DeviceArea):
 
 	# public interface to clients
 	def get_device_by_iid(self, iid):
+		# note this is good for all devices: both controls and outputs
 		return self.devices[iid]
 
 	def get_devicearea_by_iid(self, iid):
 		return self.areas[iid]
+		
+	# repeater action callback
+	def on_user_action(self, iid):
+		logger.debug('repeater action iid %d' % iid)
+		device = self.get_device_by_iid(iid)
+		device.on_user_action()
 
 	# private interface for owned objects to talk to repeater
 	def _register_device(self, device):

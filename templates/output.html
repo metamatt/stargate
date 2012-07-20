@@ -25,7 +25,8 @@
 {% endif %}
 
 <p>
-	TBD: change history / statistics
+	Changed {{ count_items(device.action_count, 'time') }} today;
+	{{ 'most recently ' + device.get_age() if device.get_age() else "no changes in last 24 hours" }}.
 </p>
 
 {% endblock content %}

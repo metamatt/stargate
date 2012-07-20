@@ -36,12 +36,16 @@ CRLF = '\r\n'
 class OutputCache(object):
 	# Low-level cache of last seen level for each device (output, button, led)
 	repeater = None
+	output_levels = {} # map from output iid to level
+	button_states = {} # map from device iid to map from button component id to state
+	led_states = {} # map from device iid to map from led component id to state
+	refreshing = set() # set of iids for which we have a refresh in progress
+	subscribers = [] # list of objects on which we will call on_user_action()
 
+	# client public interface
 	def __init__(self):
-		self.output_levels = {}
-		self.button_states = {}
-		self.led_states = {}
-	
+		pass
+
 	def watch_output(self, output_iid):
 		self.output_levels[output_iid] = 'stale'
 	
@@ -53,10 +57,9 @@ class OutputCache(object):
 		for cid in led_cids:
 			led[cid] = 'stale'
 
-	def record_output_level(self, output_iid, level):
-		# should be called only by RaRepeater.repeaterReply()
-		logger.info('record_output_level: output %d level %d' % (output_iid, level))
-		self.output_levels[output_iid] = level
+	def subscribe_to_actions(self, subscriber):
+		assert hasattr(subscriber, 'on_user_action')
+		self.subscribers.append(subscriber)
 
 	def get_output_level(self, output_iid):
 		level = self.output_levels[output_iid]
@@ -66,11 +69,6 @@ class OutputCache(object):
 			level = self.output_levels[output_iid]
 		return level
 
-	def record_button_state(self, device_iid, button_cid, state):
-		# should be called only by RaRepeater.repeaterReply()
-		logger.info('record_button_state: device %d button %d state %d' % (device_iid, button_cid, state))
-		self.button_states[device_iid][button_cid] = state
-
 	def get_button_state(self, device_iid, button_cid):
 		state = self.button_states[device_iid][button_cid]
 		while state == 'stale':
@@ -78,11 +76,6 @@ class OutputCache(object):
 			time.sleep(0.1)
 			state = self.button_states[device_iid][button_cid]
 		return state
-
-	def record_led_state(self, device_iid, led_cid, state):
-		# should be called only by RaRepeater.repeaterReply()
-		logger.info('record_led_state: device %d led %d state %d' % (device_iid, led_cid, state))
-		self.led_states[device_iid][led_cid] = state
 
 	def get_led_state(self, device_iid, led_cid):
 		state = self.led_states[device_iid][led_cid]
@@ -92,24 +85,27 @@ class OutputCache(object):
 			state = self.led_states[device_iid][led_cid]
 		return state
 
-	def _refresh_output(self, iid):
-		self.repeater.repeaterCommand('?OUTPUT,%d,1' % iid) # async
+	# RaRepeater private interface
+	def _record_output_level(self, output_iid, level):
+		# should be called only by RaRepeater.receive_repeater_reply()
+		logger.info('record_output_level: output %d level %d' % (output_iid, level))
+		self.output_levels[output_iid] = level
+		self._broadcast_change(output_iid)
 
-	def _refresh_button(self, iid, bid):
-		# XXX docs don't show how to do this, or even that it can be done.
-		# self.repeater.repeaterCommand('?DEVICE,%d,%d,X' % (iid, bid))
-		# Responds "~ERROR,1" without the 3rd number, with "~ERROR,3" with
-		# a X==0 or X>=2, and with "~DEVICE,iid,00000,1,1" for X==0 or X==1.
-		# We find out that buttons are pressed/released when it actually
-		# happens, so we can track state as it changes; let's just pretend
-		# that all buttons are unpressed at startup.
-		self.record_button_state(iid, bid, 0)
+	def _record_button_state(self, device_iid, button_cid, state):
+		# should be called only by RaRepeater.receive_repeater_reply()
+		logger.info('record_button_state: device %d button %d state %d' % (device_iid, button_cid, state))
+		self.button_states[device_iid][button_cid] = state
+		self._broadcast_change(device_iid)
 
-	def _refresh_led(self, iid, lid):
-		self.repeater.repeaterCommand('?DEVICE,%d,%d,9' % (iid, lid)) # async
+	def _record_led_state(self, device_iid, led_cid, state):
+		# should be called only by RaRepeater.receive_repeater_reply()
+		logger.info('record_led_state: device %d led %d state %d' % (device_iid, led_cid, state))
+		self.led_states[device_iid][led_cid] = state
 
 	def _bind_repeater(self, repeater):
 		self.repeater = repeater
+		# now that we have a repeater, do an async/background refresh of all cacheable state
 		for iid in self.output_levels.keys():
 			self._refresh_output(iid)
 		for iid in self.button_states.keys():
@@ -119,6 +115,43 @@ class OutputCache(object):
 			for lid in self.led_states[iid].keys():
 				self._refresh_led(iid, lid)
 
+	# internal private interface
+	def _refresh_output(self, iid):
+		self._mark_refresh_pending(iid)
+		self.repeater.send_repeater_command('?OUTPUT,%d,1' % iid) # async
+
+	def _refresh_button(self, iid, bid):
+		self._mark_refresh_pending(iid)
+		# XXX docs don't show how to do this, or even that it can be done.
+		# self.repeater.send_repeater_command('?DEVICE,%d,%d,X' % (iid, bid))
+		# Responds "~ERROR,1" without the 3rd number, with "~ERROR,3" with
+		# a X==0 or X>=2, and with "~DEVICE,iid,00000,1,1" for X==0 or X==1.
+		# We find out that buttons are pressed/released when it actually
+		# happens, so we can track state as it changes; let's just pretend
+		# that all buttons are unpressed at startup.
+		self._record_button_state(iid, bid, 0)
+
+	def _refresh_led(self, iid, lid):
+		self._mark_refresh_pending(iid)
+		self.repeater.send_repeater_command('?DEVICE,%d,%d,9' % (iid, lid)) # async
+
+	def _mark_refresh_pending(self, iid):
+		# Record that we're asking the repeater for status, so when a status message
+		# arrives, it came from us and not a user action -- so don't broadcast an
+		# on_update message
+		logger.debug('mark_for_refresh: setting ignore flag for iid %d' % iid)
+		self.refreshing.add(iid)
+		
+	def _broadcast_change(self, iid):
+		# XXX do details matter? (for device, which button, which state? even if not button, should we avoid separate press+release msgs?)
+		try: # if we had a refresh in progress, unmark it and don't send an update
+			self.refreshing.remove(iid)
+			logger.debug('broadcast_change: removed ignore flag for iid %d' % iid)
+		except KeyError: # the normal case, where a refresh is not in progress
+			logger.debug('broadcast_change: sending on_user_action for iid %d' % iid)
+			for subscriber in self.subscribers:
+				subscriber.on_user_action(iid)
+
 
 class RaRepeater(object):
 	state = None
@@ -127,7 +160,7 @@ class RaRepeater(object):
 	def __init__(self):
 		self._prep_response_handlers()
 	
-	def reset_cache(self, cache):
+	def bind_cache(self, cache):
 		self.cache = cache
 		self.cache._bind_repeater(self)
 	
@@ -135,21 +168,21 @@ class RaRepeater(object):
 		return self.cache.get_output_level(output_iid)
 
 	def set_output_level(self, output_iid, level):
-		self.repeaterCommand('#OUTPUT,%d,1,%g' % (output_iid, level))
+		self.send_repeater_command('#OUTPUT,%d,1,%g' % (output_iid, level))
 
 	def get_button_state(self, device_iid, button_cid):
 		return self.cache.get_button_state(device_iid, button_cid)
 
 	def set_button_state(self, device_iid, button_cid, pressed):
 		action = 3 if pressed else 4
-		self.repeaterCommand('#DEVICE,%d,%d,%d' % (device_iid, button_cid, action))
+		self.send_repeater_command('#DEVICE,%d,%d,%d' % (device_iid, button_cid, action))
 
 	def get_led_state(self, device_iid, led_cid):
 		return self.cache.get_led_state(device_iid, led_cid)
 
 	def set_led_state(self, device_iid, led_cid, on):
 		state = 1 if on else 0
-		self.repeaterCommand('#DEVICE,%d,%d,9,%d' % (device_iid, led_cid, state))
+		self.send_repeater_command('#DEVICE,%d,%d,9,%d' % (device_iid, led_cid, state))
 
 	def connect(self, hostname, username, password):
 		self.hostname = hostname
@@ -157,30 +190,30 @@ class RaRepeater(object):
 		self.socket.connect((hostname, 23))
 		self.socket.setblocking(0)
 		self.state = STATE_FRESH_CONNECTION
-		self.startListenThread()
+		self.start_listen_thread()
 
-		self.waitForState(STATE_WANT_LOGIN)
-		self.repeaterCommand(username)
-		self.waitForState(STATE_WANT_PASSWORD)
-		self.repeaterCommand(password)
-		self.waitForState(STATE_READY)
+		self.wait_for_state(STATE_WANT_LOGIN)
+		self.send_repeater_command(username)
+		self.wait_for_state(STATE_WANT_PASSWORD)
+		self.send_repeater_command(password)
+		self.wait_for_state(STATE_READY)
 		self.enable_monitoring()
 		
 	def enable_monitoring(self):
-		self.repeaterCommand('#MONITORING,255,1')
+		self.send_repeater_command('#MONITORING,255,1')
 
-	def repeaterCommand(self, cmd):
-		self._setState(STATE_PROCESSING)
-		logger.debug('repeaterCommand: send %s' % repr(cmd))
+	def send_repeater_command(self, cmd):
+		self._set_repeater_state(STATE_PROCESSING)
+		logger.debug('send_repeater_command: send %s' % repr(cmd))
 		sent = self.socket.send(cmd + CRLF)
 		if sent != len(cmd) + 2:
-			logger.warning('repeaterCommand: sent %d of %d bytes' % (sent, 2 + len(cmd)))
+			logger.warning('send_repeater_command: sent %d of %d bytes' % (sent, 2 + len(cmd)))
 
 	def _match_output_response(self, match):
 		output = int(match.group(1))
 		level = float(match.group(2))
 		logger.debug('match %s -> output %d set level %g' % (match.group(), output, level))
-		self.cache.record_output_level(output, level)
+		self.cache._record_output_level(output, level)
 
 	def _match_button_response(self, match):
 		device = int(match.group(1))
@@ -188,7 +221,7 @@ class RaRepeater(object):
 		action = int(match.group(3))
 		logger.debug('match %s -> device %d button %d action %d' % (match.group(), device, component, action))
 		state = True if action == 3 else False
-		self.cache.record_button_state(device, component, state)
+		self.cache._record_button_state(device, component, state)
 
 	def _match_led_response(self, match):
 		device = int(match.group(1))
@@ -197,7 +230,7 @@ class RaRepeater(object):
 		logger.debug('match %s -> device %d led %d to %d' % (match.group(), device, component, parameter))
 		# XXX doesn't handle LED flashing state
 		state = True if parameter == 1 else False
-		self.cache.record_led_state(device, component, state)
+		self.cache._record_led_state(device, component, state)
 
 	def _prep_response_handlers(self):
 		self.response_handler_list = [
@@ -206,14 +239,14 @@ class RaRepeater(object):
 			(re.compile('~DEVICE,(\d+),(\d+),(\d)'), self._match_button_response),
 		]
 
-	def repeaterReply(self, line):
-		logger.debug('repeaterReply: reply %s' % repr(line))
+	def receive_repeater_reply(self, line):
+		logger.debug('receive_repeater_reply: reply %s' % repr(line))
 		# Handle prompts as state transitions. These can occur on a line by themself, or as the
 		# prefix of a line containing additional data. So we look for the prompt as a prefix,
 		# if found act on it and strip it off, then continue handling the rest of hte line.
 		for prompt in ra_prompt_map:
 			if line.startswith(prompt):
-				self._setState(ra_prompt_map[prompt])
+				self._set_repeater_state(ra_prompt_map[prompt])
 				line = line[len(prompt):]
 
 		if len(line) > 0:
@@ -230,7 +263,7 @@ class RaRepeater(object):
 			if not match:
 				logger.warning('unmatched repeater reply: %s' % repr(line))
 
-	def startListenThread(self):
+	def start_listen_thread(self):
 		logger = logging.getLogger(__name__ + '.listener')
 		class RepeaterListener(threading.Thread):
 			repeater = None
@@ -272,7 +305,7 @@ class RaRepeater(object):
 							unprocessed = lines.pop()
 						# Now send complete received lines of data back to main thread for processing.
 						for line in lines:
-							self.repeater.repeaterReply(line)
+							self.repeater.receive_repeater_reply(line)
 				except:
 					logger.exception('repeater listener died')
 					# XXX should reconnect...
@@ -281,13 +314,13 @@ class RaRepeater(object):
 		self.listener = RepeaterListener(self)
 		self.listener.start()
 	
-	def _setState(self, state):
+	def _set_repeater_state(self, state):
 		logger.debug('debug: state now %d' % state)
 		self.state = state
 		# wake anyone waiting for this state change
 		self.stateEvent.set()
 
-	def waitForState(self, state):
+	def wait_for_state(self, state):
 		logger.debug('debug: want state %d' % state)
 		while self.state != state:
 			self.stateEvent.clear()

@@ -1,6 +1,9 @@
 <!DOCTYPE html>
+{% macro count_items(count, typename) -%}
+	{{ count }} {{ typename }}{{ 's' if count != 1 }}
+{%- endmacro %}
 {% macro count_list_items(list, typename) -%}
-	{{ list | length }} {{ typename }}{{ 's' if list | length > 1 }}
+	{{ count_items(list | length, typename) }}
 {%- endmacro %}
 <html lang="en">
 <head>
