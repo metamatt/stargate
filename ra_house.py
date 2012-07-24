@@ -270,7 +270,13 @@ class KeypadDevice(ControlDevice):
 		return self.buttons[button_cid]
 
 	def get_any_button_pressed(self):
-		return any([b.get_button_state() for b in self.buttons])
+		return any([b.get_button_state() for b in self.buttons.values()])
+
+	def get_num_buttons_pressed(self):
+		return reduce(lambda x, y: x+y, [(1 if b.get_button_state() else 0) for b in self.buttons.values()])
+		
+	def get_level(self):
+		return self.get_num_buttons_pressed()
 
 	def on_user_action(self):
 		self.house._on_device_state_change(self.iid, self.get_any_button_pressed())
