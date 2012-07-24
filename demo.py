@@ -22,7 +22,7 @@ def human_readable_timedelta(delta, text_if_none = 'unknown'):
 		return text_if_none
 	if type(delta) != datetime.timedelta:
 		delta = datetime.timedelta(seconds = delta)
-	if delta == datetime.timedelta(0):
+	if delta == datetime.timedelta(0): # XXX should we consider time less than a second as 'right now' or 'less than a second'?
 		return 'right now' # XXX in some contexts, 'no time' -- 'changed no time ago', 'changed right now', 'on since right now'...
 
 	days = delta.days
@@ -34,7 +34,10 @@ def human_readable_timedelta(delta, text_if_none = 'unknown'):
 	tokens.append('%d hour%s' % (hours, '' if hours == 1 else 's')) if hours else None
 	tokens.append('%d minute%s' % (minutes, '' if minutes == 1 else 's')) if minutes else None
 	tokens.append('%d second%s'% (seconds, '' if seconds == 1 else 's')) if seconds else None
-	return (', ').join(tokens)
+	if len(tokens):
+		return (', ').join(tokens)
+	else:
+		return 'less than a second'
 
 
 app.jinja_env.filters['order_device_states'] = order_device_states
