@@ -115,8 +115,9 @@ class OutputDevice(LutronDevice):
 	def get_name_for_level(self, level):
 		return 'on' if level > 0 else 'off'
 
-	def on_user_action(self):
-		self.house._on_device_state_change(self.iid, self.get_level() > 0) # XXX what does this mean for shades...
+	def on_user_action(self, level, refresh):
+		assert level == self.get_level()
+		self.house._on_device_state_change(self.iid, level > 0, refresh)
 	
 
 class SwitchedOutput(OutputDevice):
@@ -278,8 +279,8 @@ class KeypadDevice(ControlDevice):
 	def get_level(self):
 		return self.get_num_buttons_pressed()
 
-	def on_user_action(self):
-		self.house._on_device_state_change(self.iid, self.get_any_button_pressed())
+	def on_user_action(self, state, refresh):
+		self.house._on_device_state_change(self.iid, state, refresh)
 
 	def get_name_for_level(self, level):
 		return 'pressed' if level > 0 else 'unpressed'
@@ -388,6 +389,11 @@ class House(DeviceArea):
 		self.repeater = repeater
 		self.layout = layout
 		self.persist = persistence.SgPersistence('stargate.sqlite')
+		
+		# build house from layout
+		self.iid = -1
+		self.name = 'Global'
+		self.members = [DeviceArea(self, area_spec) for area_spec in layout.get_areas()]
 
 		# tell repeater about the layout (just what output devices to query)
 		cache = ra_repeater.OutputCache()
@@ -398,11 +404,6 @@ class House(DeviceArea):
 			cache.watch_device(iid, device.get_button_component_ids(), device.get_led_component_ids())
 		cache.subscribe_to_actions(self)
 		repeater.bind_cache(cache)
-		
-		# build house from layout
-		self.iid = -1
-		self.name = 'Global'
-		self.members = [DeviceArea(self, area_spec) for area_spec in layout.get_areas()]
 
 	# public interface to clients
 	def get_device_by_iid(self, iid):
@@ -413,14 +414,17 @@ class House(DeviceArea):
 		return self.areas[iid]
 		
 	# repeater action callback
-	def on_user_action(self, iid):
+	def on_user_action(self, iid, state, refresh):
 		logger.debug('repeater action iid %d' % iid)
 		device = self.get_device_by_iid(iid)
-		device.on_user_action()
+		device.on_user_action(state, refresh)
 	
 	# private interface for owned objects to talk to persistence layer
-	def _on_device_state_change(self, iid, state):
-		self.persist.on_device_state_change('radiora2', iid, state)
+	def _on_device_state_change(self, iid, state, refresh):
+		if refresh:
+			self.persist.init_device_state('radiora2', iid, state)
+		else:
+			self.persist.on_device_state_change('radiora2', iid, state)
 		
 	def _get_delta_since_change(self, iid):
 		return self.persist.get_delta_since_change('radiora2', iid)
@@ -434,7 +438,6 @@ class House(DeviceArea):
 	# private interface for owned objects to talk to repeater
 	def _register_device(self, device):
 		self.devices[device.iid] = device
-		self.persist.fastforward_device_state('radiora2', device.iid)
 		
 	def _register_area(self, area):
 		self.areas[area.iid] = area

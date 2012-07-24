@@ -90,18 +90,19 @@ class OutputCache(object):
 		# should be called only by RaRepeater.receive_repeater_reply()
 		logger.info('record_output_level: output %d level %d' % (output_iid, level))
 		self.output_levels[output_iid] = level
-		self._broadcast_change(output_iid)
+		self._broadcast_change(output_iid, level)
 
 	def _record_button_state(self, device_iid, button_cid, state):
 		# should be called only by RaRepeater.receive_repeater_reply()
 		logger.info('record_button_state: device %d button %d state %d' % (device_iid, button_cid, state))
 		self.button_states[device_iid][button_cid] = state
-		self._broadcast_change(device_iid)
+		self._broadcast_change(device_iid, state)
 
 	def _record_led_state(self, device_iid, led_cid, state):
 		# should be called only by RaRepeater.receive_repeater_reply()
 		logger.info('record_led_state: device %d led %d state %d' % (device_iid, led_cid, state))
 		self.led_states[device_iid][led_cid] = state
+		# XXX for now at least, we don't send state change notifications for LEDs
 
 	def _bind_repeater(self, repeater):
 		self.repeater = repeater
@@ -142,15 +143,17 @@ class OutputCache(object):
 		logger.debug('mark_for_refresh: setting ignore flag for iid %d' % iid)
 		self.refreshing.add(iid)
 		
-	def _broadcast_change(self, iid):
+	def _broadcast_change(self, iid, state):
 		# XXX do details matter? (for device, which button, which state? even if not button, should we avoid separate press+release msgs?)
 		try: # if we had a refresh in progress, unmark it and don't send an update
 			self.refreshing.remove(iid)
 			logger.debug('broadcast_change: removed ignore flag for iid %d' % iid)
+			refresh = True
 		except KeyError: # the normal case, where a refresh is not in progress
-			logger.debug('broadcast_change: sending on_user_action for iid %d' % iid)
-			for subscriber in self.subscribers:
-				subscriber.on_user_action(iid)
+			refresh = False
+		logger.debug('broadcast_change: sending on_user_action(iid=%d, refresh=%s)' % (iid, str(refresh)))
+		for subscriber in self.subscribers:
+			subscriber.on_user_action(iid, state, refresh)
 
 
 class RaRepeater(object):
