@@ -90,14 +90,15 @@ class SgPersistence(object):
 			c.execute('INSERT OR REPLACE INTO device_status VALUES(?,?,?,?)', (dev_id, ts_current.isoformat(), ts_current.isoformat(), state))
 			# update history bucket
 			history = self._get_history_bucket(dev_id, 1)
-			if prev_state == 0: # from off to on
-				logger.debug('adding %g to %g of off_time for did %d' % (time_in_prev_state, history['off_time'], dev_id))
-				off_time = history['off_time'] + time_in_prev_state
-				on_time = history['on_time']
-			elif prev_state > 0: # from on to off
-				logger.debug('adding %g to %g of on_time for did %d' % (time_in_prev_state, history['on_time'], dev_id))
-				off_time = history['off_time']
-				on_time = history['on_time'] + time_in_prev_state
+			on_time, off_time = (history['on_time'], history['off_time'])
+			if prev_state == 0: # was off, tally some off_time
+				logger.debug('adding %g to %g of off_time for did %d' % (time_in_prev_state, off_time, dev_id))
+				off_time += time_in_prev_state
+			elif prev_state > 0: # was on, tally some on_time
+				logger.debug('adding %g to %g of on_time for did %d' % (time_in_prev_state, on_time, dev_id))
+				on_time += time_in_prev_state
+			else:
+				logger.debug('ignoring %g of time in unknown state for did %d' % (time_in_prev_state, dev_id))
 			# note that we ignore any changes from prev_state == -1
 			num_changes = history['num_changes'] + 1
 			c.execute('INSERT OR REPLACE INTO change_history_buckets(sg_device_id, bucket_id, num_changes, on_time, off_time) VALUES(?,?,?,?,?)',
