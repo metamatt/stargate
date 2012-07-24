@@ -274,6 +274,8 @@ class KeypadDevice(ControlDevice):
 		return any([b.get_button_state() for b in self.buttons.values()])
 
 	def get_num_buttons_pressed(self):
+		if not len(self.buttons):
+			return 0
 		return reduce(lambda x, y: x+y, [(1 if b.get_button_state() else 0) for b in self.buttons.values()])
 		
 	def get_level(self):
