@@ -6,8 +6,8 @@
 # RadioRa2 devices.
 
 import logging
-import time
 
+import persistence
 import ra_repeater
 
 
@@ -45,8 +45,12 @@ class LutronDevice(object):
 	def is_in_state(self, state):
 		# special case "age=NNN"
 		if state[:4] == 'age=':
-			age = int(state[4:])
-			return self.get_age() < age
+			age_max = int(state[4:])
+			delta = self.get_delta_since_change()
+			if not delta:
+				return False
+			my_age = delta.days * 86400 + delta.seconds
+			return my_age < age_max
 		# look for handler named after state
 		handler = 'is_' + state
 		if hasattr(self, handler):
@@ -69,24 +73,17 @@ class LutronDevice(object):
 			self._possible_actions = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
 		return self._possible_actions
 	
-	def on_user_action(self):
-		self.action_count += 1
-		self.last_action_time = time.time()
+	def get_delta_since_change(self):
+		return self.house._get_delta_since_change(self.iid)
 		
-	def get_age(self):
-		return time.time() - (self.last_action_time if self.last_action_time else 0)
-
-	def get_recent_use_estimate(self):
-		age_secs = self.get_age()
-		if age_secs > 24 * 3600:
-			return None
-		elif age_secs > 3600:
-			(count, unit) = (age_secs // 3600, 'hour')
-		elif age_secs > 60:
-			(count, unit) = (age_secs // 60, 'minute')
-		else:
-			(count, unit) = (int(age_secs), 'second')
-		return '%d %s%s ago' % (count, unit, 's' if count != 1 else '')
+	def get_action_count(self, bucket = 1):
+		return self.house._get_action_count(self.iid, bucket)
+		
+	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
+	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
+	# it's allowed to pass a level as the levelstate.
+	def get_time_in_state(self, levelstate, bucket = 1):
+		return self.house._get_time_in_state(self.iid, levelstate, bucket)
 
 
 class OutputDevice(LutronDevice):
@@ -115,6 +112,12 @@ class OutputDevice(LutronDevice):
 		getattr(self, handler)()
 		return True
 
+	def get_name_for_level(self, level):
+		return 'on' if level > 0 else 'off'
+
+	def on_user_action(self):
+		self.house._on_device_state_change(self.iid, self.get_level() > 0) # XXX what does this mean for shades...
+	
 
 class SwitchedOutput(OutputDevice):
 	def __init__(self, area, device_spec):
@@ -152,8 +155,6 @@ class ShadeOutput(OutputDevice):
 	def be_half(self):
 		self.set_level(50)
 
-	# XXX should we define "partially open", "fully open", "partially closed", "fully closed"?
-	# and a half-open shade is both partially open and closed? Otherwise, what is it?
 	def is_closed(self):
 		return self.get_level() == 0
 	
@@ -165,6 +166,9 @@ class ShadeOutput(OutputDevice):
 
 	def be_open(self):
 		self.set_level(100)
+
+	def get_name_for_level(self, level):
+		return 'open' if level > 0 else 'closed'
 
 
 class ContactClosureOutput(OutputDevice):
@@ -186,6 +190,9 @@ class ContactClosureOutput(OutputDevice):
 
 	def be_open(self):
 		self.set_level(100)
+
+	def get_name_for_level(self, level):
+		return 'active' if level > 0 else 'inactive'
 
 
 def create_device_for_output(area, output_spec):
@@ -261,6 +268,15 @@ class KeypadDevice(ControlDevice):
 	
 	def get_button(self, button_cid):
 		return self.buttons[button_cid]
+
+	def get_any_button_pressed(self):
+		return any([b.get_button_state() for b in self.buttons])
+
+	def on_user_action(self):
+		self.house._on_device_state_change(self.iid, self.get_any_button_pressed())
+
+	def get_name_for_level(self, level):
+		return 'pressed' if level > 0 else 'unpressed'
 
 
 class RemoteKeypadDevice(KeypadDevice):
@@ -365,6 +381,7 @@ class House(DeviceArea):
 		self.areas = {}
 		self.repeater = repeater
 		self.layout = layout
+		self.persist = persistence.SgPersistence('stargate.sqlite')
 
 		# tell repeater about the layout (just what output devices to query)
 		cache = ra_repeater.OutputCache()
@@ -394,10 +411,24 @@ class House(DeviceArea):
 		logger.debug('repeater action iid %d' % iid)
 		device = self.get_device_by_iid(iid)
 		device.on_user_action()
+	
+	# private interface for owned objects to talk to persistence layer
+	def _on_device_state_change(self, iid, state):
+		self.persist.on_device_state_change('radiora2', iid, state)
+		
+	def _get_delta_since_change(self, iid):
+		return self.persist.get_delta_since_change('radiora2', iid)
+
+	def _get_action_count(self, iid, bucket):
+		return self.persist.get_action_count('radiora2', iid, bucket)
+
+	def _get_time_in_state(self, iid, state, bucket):
+		return self.persist.get_time_in_state('radiora2', iid, state, bucket)
 
 	# private interface for owned objects to talk to repeater
 	def _register_device(self, device):
 		self.devices[device.iid] = device
+		self.persist.fastforward_device_state('radiora2', device.iid)
 		
 	def _register_area(self, area):
 		self.areas[area.iid] = area

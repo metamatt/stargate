@@ -40,7 +40,7 @@
 		{% endfor %}
 		{% if states|length %}){% endif %}
 	{% endfor %}
-	| used in last
+	| changed in last
 	  <a href="{{ url_for('enumerate_outputs', filterlist = 'age=3600') }}">hour</a>
 	  <a href="{{ url_for('enumerate_outputs', filterlist = 'age=86400') }}">day</a>
 </p>

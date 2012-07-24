@@ -1,3 +1,4 @@
+import datetime
 import time
 
 from flask import Flask, request, render_template, redirect, url_for
@@ -14,7 +15,30 @@ def order_device_states(states, devclass = 'device'):
 		return ra_house.ControlDevice.order_states(states)
 	else:
 		return ra_house.LutronDevice.order_states(states)
+
+
+def human_readable_timedelta(delta, text_if_none = 'unknown'):
+	if not delta:
+		return text_if_none
+	if type(delta) != datetime.timedelta:
+		delta = datetime.timedelta(seconds = delta)
+	if delta == datetime.timedelta(0):
+		return 'right now' # XXX in some contexts, 'no time' -- 'changed no time ago', 'changed right now', 'on since right now'...
+
+	days = delta.days
+	hours, remainder = divmod(delta.seconds, 3600)
+	minutes, seconds = divmod(remainder, 60)
+	
+	tokens = []
+	tokens.append('%d day%s' % (days, '' if days == 1 else 's')) if days else None
+	tokens.append('%d hour%s' % (hours, '' if hours == 1 else 's')) if hours else None
+	tokens.append('%d minute%s' % (minutes, '' if minutes == 1 else 's')) if minutes else None
+	tokens.append('%d second%s'% (seconds, '' if seconds == 1 else 's')) if seconds else None
+	return (', ').join(tokens)
+
+
 app.jinja_env.filters['order_device_states'] = order_device_states
+app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
 
 
 @app.route('/')

@@ -25,8 +25,10 @@
 {% endif %}
 
 <p>
-	Changed {{ count_items(device.action_count, 'time') }} today;
-	{{ 'most recently ' + device.get_recent_use_estimate() if device.get_recent_use_estimate() else "no changes in last 24 hours" }}.
+	{{ device.name }} has been {{ device.get_name_for_level(device.get_level()) }} for {{ device.get_delta_since_change() | human_readable_timedelta('longer than data is available') }};
+	{{ count_items(device.get_action_count(), 'change') }} today;
+	total '{{ device.get_name_for_level(1) }}' time is {{ device.get_time_in_state(True) | human_readable_timedelta }}
+	with average level of TBD.
 </p>
 
 {% endblock content %}
