@@ -12,10 +12,8 @@ import optparse
 import os
 import yaml
 
-import demo
-import ra_house
-import ra_layout
-import ra_repeater
+import webif.demo
+import gateways.radiora2 as radiora2
 
 
 def str_to_loglevel(loglevel_str):
@@ -35,6 +33,10 @@ if __name__ == '__main__':
 	config_file = open(options.config)
 	config = yaml.safe_load(config_file)
 	config_file.close()
+	
+	# go to working directory
+	orig_cwd = os.getcwd()
+	os.chdir(config['working_dir'])
 	
 	# configure logging
 	logger = logging.getLogger()
@@ -76,20 +78,12 @@ if __name__ == '__main__':
 	if config['server']['webdebug'] and not os.environ.get('WERKZEUG_RUN_MAIN'):
 		logger.warning('startup: pid %d is the werkzeug reloader' % os.getpid())
 		house = None
+		os.chdir(orig_cwd)
 	else:
 		logger.warning('startup: pid %d is the active werkzeug' % os.getpid())
-		repeater_config = config['repeater']
-		layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
-		if repeater_config.has_key('cached_database'):
-			layout.read_cached_db(repeater_config['cached_database'])
-		else:
-			layout.get_live_db(repeater_config['hostname'])
-		layout.map_db()
-
-		repeater = ra_repeater.RaRepeater()
-		repeater.connect(repeater_config['hostname'], repeater_config['username'], repeater_config['password'])
-	
-		house = ra_house.House(repeater, layout)
+		# XXX gateways aren't truly modular yet; always load radiora2
+		repeater_config = config['gateways']['radiora2']['repeater']
+		house = radiora2.build_house(repeater_config)
 
 	# run the web app
-	demo.start(house, **config['server'])
+	webif.demo.start(house, **config['server'])

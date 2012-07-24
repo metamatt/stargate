@@ -3,7 +3,7 @@ import time
 
 from flask import Flask, request, render_template, redirect, url_for
 
-import ra_house
+import gateways.radiora2.ra_house as ra_house
 
 app = Flask(__name__)
 house = None

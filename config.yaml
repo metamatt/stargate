@@ -1,16 +1,13 @@
-repeater:
-    hostname: lutron-radiora
-    username: stargate
-    password: stargate
-    cached_database: DbXmlInfo.xml
-
-    layout:
-        ignore_keypads: [1]
+# global configuration
+working_dir: ./RUN
 
 logging:
     logfile: stargate.log # stargate-%(pid)d.log
-    console_level: warning
+    # global output level
     level: debug
+    # equal or higher level which is output to console
+    console_level: warning
+    # loglevels for plugin modules
     level.ra_repeater: debug
     level.ra_repeater.listener: info
 
@@ -18,3 +15,17 @@ server:
     port: 5000
     public: false
     webdebug: true
+
+# gateway plugin module configuration
+gateways:
+    radiora2:
+        repeater:
+            hostname: lutron-radiora
+            username: stargate
+            password: stargate
+            cached_database: DbXmlInfo.xml
+
+            layout:
+                ignore_keypads: [1]
+
+    # TODO: more modules
