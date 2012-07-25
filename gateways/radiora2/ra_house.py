@@ -391,6 +391,7 @@ class House(DeviceArea):
 		self.repeater = repeater
 		self.layout = layout
 		self.persist = persistence.SgPersistence('stargate.sqlite')
+		self.gateway_name = 'radiora2' # XXX allow demo.py to find us, until we become a real gateway plugin
 		
 		# build house from layout
 		self.iid = -1
@@ -461,3 +462,4 @@ class House(DeviceArea):
 	
 	def _set_led_state(self, iid, lid, on):
 		return self.repeater.set_led_state(iid, lid, on)
+

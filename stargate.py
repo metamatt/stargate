@@ -12,8 +12,8 @@ import optparse
 import os
 import yaml
 
-import webif.demo
-import gateways.radiora2 as radiora2
+import webif.demo as webapp
+from sg_house import StargateHouse
 
 
 def str_to_loglevel(loglevel_str):
@@ -81,9 +81,7 @@ if __name__ == '__main__':
 		os.chdir(orig_cwd)
 	else:
 		logger.warning('startup: pid %d is the active werkzeug' % os.getpid())
-		# XXX gateways aren't truly modular yet; always load radiora2
-		repeater_config = config['gateways']['radiora2']['repeater']
-		house = radiora2.build_house(repeater_config)
+		house = StargateHouse(config)
 
 	# run the web app
-	webif.demo.start(house, **config['server'])
+	webapp.start(house, **config['server'])

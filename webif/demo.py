@@ -3,11 +3,11 @@ import time
 
 from flask import Flask, request, render_template, redirect, url_for
 
-import gateways.radiora2.ra_house as ra_house
-
 app = Flask(__name__)
 house = None
 
+# XXX need way to access this without hardcoding radiora2 package here
+import gateways.radiora2.ra_house as ra_house
 def order_device_states(states, devclass = 'device'):
 	if devclass == 'output':
 		return ra_house.OutputDevice.order_states(states)
@@ -184,7 +184,7 @@ def inject_house():
 def start(theHouse, port = None, public = False, webdebug = False):
 	# save house object for handler classes to use
 	global house
-	house = theHouse
+	house = theHouse.gateways['radiora2'] if theHouse else None # XXX ignore SgHouse, deal only with ra_house.House for now
 
 	# start webserver
 	app_args = {}

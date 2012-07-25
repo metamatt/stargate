@@ -6,7 +6,8 @@ import ra_house
 import ra_layout
 import ra_repeater
 
-def build_house(repeater_config):
+def init(sg_house, gateway_config):
+	repeater_config = gateway_config['repeater']
 	layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
 	if repeater_config.has_key('cached_database'):
 		layout.read_cached_db(repeater_config['cached_database'])
