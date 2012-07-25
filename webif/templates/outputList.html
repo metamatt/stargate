@@ -9,7 +9,7 @@
 	{% endif %}
 	{% include 'inc/filterbar.html' %}
 </p>
-{% for device_group in devices | groupby('area') | sort(attribute = 'grouper.name') %}
+{% for device_group in devices | groupby('ra_area') | sort(attribute = 'grouper.name') %}
 	{% set area = device_group.grouper %}
 	{% if not area_filter %}
 		<!-- redundant when scoped to a single area -->

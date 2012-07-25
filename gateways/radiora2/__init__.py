@@ -2,11 +2,11 @@
 #
 # stargate.gateways.radiora2 package init
 
-import ra_house
+import ra_gateway
 import ra_layout
 import ra_repeater
 
-def init(sg_house, gateway_config):
+def init(house, gateway_config):
 	repeater_config = gateway_config['repeater']
 	layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
 	if repeater_config.has_key('cached_database'):
@@ -18,5 +18,4 @@ def init(sg_house, gateway_config):
 	repeater = ra_repeater.RaRepeater()
 	repeater.connect(repeater_config['hostname'], repeater_config['username'], repeater_config['password'])
 
-	house = ra_house.House(repeater, layout)
-	return house
+	return ra_gateway.RaGateway(house, repeater, layout)

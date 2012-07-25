@@ -7,14 +7,15 @@
 
 import logging
 
-import persistence
+import sg_house
+import ra_layout
 import ra_repeater
 
 
 logger = logging.getLogger(__name__)
 
 
-class LutronDevice(object):
+class LutronDevice(sg_house.StargateDevice):
 	# Individual RadioRa device -- includes both controllable outputs (what Lutron calls an "output")
 	# and we will subclass as "OutputDevice") and inputs/controls (what Lutron calls an "input", I
 	# would typically call a "keypad", and we will subclass as "ControlDevice").
@@ -23,24 +24,18 @@ class LutronDevice(object):
 	def order_states(states):
 		return [state for state in (OutputDevice.KNOWN_STATES_IN_ORDER[:-1] + ControlDevice.KNOWN_STATES_IN_ORDER) if state in states]
 
-	house = None
-	area = None
 	iid = None
-	name = None
 	devclass = None
 	devtype = None
-	last_action_time = None
-	action_count = 0
 	
-	def __init__(self, devclass, area, iid, name):
+	def __init__(self, devclass, ra_area, iid, name):
+		super(LutronDevice, self).__init__(ra_area.house, ra_area.sg_area, ra_area.gateway, str(iid), name)
 		self.devclass = devclass
-		self.house = area.house
-		self.area = area
+		self.ra_area = ra_area
 		self.iid = iid
-		self.name = name
 		self._possible_states = None
 		self._possible_actions = None
-		self.house._register_device(self)
+		self.gateway._register_device(self)
 
 	def is_in_state(self, state):
 		# special case "age=NNN"
@@ -74,16 +69,16 @@ class LutronDevice(object):
 		return self._possible_actions
 	
 	def get_delta_since_change(self):
-		return self.house._get_delta_since_change(self.iid)
+		return self.gateway._get_delta_since_change(self.iid)
 		
 	def get_action_count(self, bucket = 1):
-		return self.house._get_action_count(self.iid, bucket)
+		return self.gateway._get_action_count(self.iid, bucket)
 		
 	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
 	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
 	# it's allowed to pass a level as the levelstate.
 	def get_time_in_state(self, levelstate, bucket = 1):
-		return self.house._get_time_in_state(self.iid, levelstate, bucket)
+		return self.gateway._get_time_in_state(self.iid, levelstate, bucket)
 
 
 class OutputDevice(LutronDevice):
@@ -94,16 +89,16 @@ class OutputDevice(LutronDevice):
 	def order_states(states):
 		return [state for state in OutputDevice.KNOWN_STATES_IN_ORDER if state in states]
 
-	def __init__(self, area, device_spec):
-		super(OutputDevice, self).__init__('output', area, device_spec.iid, device_spec.name)
+	def __init__(self, ra_area, device_spec):
+		super(OutputDevice, self).__init__('output', ra_area, device_spec.iid, device_spec.name)
 		self.level_step = 100
 
 	# interface to get/set output levels (device scope)
 	def get_level(self):
-		return self.house._get_output_level(self.iid)
+		return self.gateway._get_output_level(self.iid)
 
 	def set_level(self, level):
-		self.house._set_output_level(self.iid, level)
+		self.gateway._set_output_level(self.iid, level)
 
 	def go_to_state(self, state):
 		handler = 'be_' + state
@@ -117,12 +112,12 @@ class OutputDevice(LutronDevice):
 
 	def on_user_action(self, level, refresh):
 		assert level == self.get_level()
-		self.house._on_device_state_change(self.iid, level > 0, refresh)
+		self.gateway._on_device_state_change(self.iid, level > 0, refresh)
 	
 
 class SwitchedOutput(OutputDevice):
-	def __init__(self, area, device_spec):
-		super(SwitchedOutput, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(SwitchedOutput, self).__init__(ra_area, device_spec)
 		self.devtype = 'light'
 
 	def is_on(self):
@@ -139,8 +134,8 @@ class SwitchedOutput(OutputDevice):
 
 
 class DimmedOutput(SwitchedOutput):
-	def __init__(self, area, device_spec):
-		super(DimmedOutput, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(DimmedOutput, self).__init__(ra_area, device_spec)
 		self.level_step = 1
 
 	def be_half(self):
@@ -148,8 +143,8 @@ class DimmedOutput(SwitchedOutput):
 
 
 class ShadeOutput(OutputDevice):
-	def __init__(self, area, device_spec):
-		super(ShadeOutput, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(ShadeOutput, self).__init__(ra_area, device_spec)
 		self.devtype = 'shade'
 		self.level_step = 1
 	
@@ -173,8 +168,8 @@ class ShadeOutput(OutputDevice):
 
 
 class ContactClosureOutput(OutputDevice):
-	def __init__(self, area, device_spec):
-		super(ContactClosureOutput, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(ContactClosureOutput, self).__init__(ra_area, device_spec)
 		self.pulsed = device_spec.get_type() == 'CCO_PULSED'
 		self.devtype = 'contactclosure'
 
@@ -196,25 +191,6 @@ class ContactClosureOutput(OutputDevice):
 		return 'active' if level > 0 else 'inactive'
 
 
-def create_device_for_output(area, output_spec):
-	# Static factory for correct OutputDevice subclass matching Lutron OutputType.
-	map_lutron_output_to_class = {
-		"INC": DimmedOutput,
-		"NON_DIM": SwitchedOutput,
-		"SYSTEM_SHADE": ShadeOutput,
-		"CCO_PULSED": ContactClosureOutput,
-		"CCO_MAINTAINED": ContactClosureOutput,
-	}
-	
-	try:
-		cls = map_lutron_output_to_class[output_spec.get_type()]
-	except: # XXX fall back on default/generic case
-		logger.error('unknown lutron device type: %s' % device_spec.get_type())
-		cls = OutputDevice
-
-	return cls(area, output_spec)
-
-
 class ControlDevice(LutronDevice):
 	# Common device subclass for controls (keypads, remotes, repeater/receiver buttons).
 
@@ -223,8 +199,8 @@ class ControlDevice(LutronDevice):
 	def order_states(states):
 		return [state for state in ControlDevice.KNOWN_STATES_IN_ORDER if state in states]
 
-	def __init__(self, area, device_spec):
-		super(ControlDevice, self).__init__('control', area, device_spec.iid, device_spec.name)
+	def __init__(self, ra_area, device_spec):
+		super(ControlDevice, self).__init__('control', ra_area, device_spec.iid, device_spec.name)
 
 
 class KeypadButton(object):
@@ -238,21 +214,21 @@ class KeypadButton(object):
 		return self.led_cid is not None
 
 	def get_button_state(self):
-		return self.device.house._get_button_state(self.device.iid, self.button_cid)
+		return self.device.gateway._get_button_state(self.device.iid, self.button_cid)
 
 	def get_led_state(self):
-		return self.device.house._get_led_state(self.device.iid, self.led_cid)
+		return self.device.gateway._get_led_state(self.device.iid, self.led_cid)
 		
 	def set_button_state(self, pressed):
-		self.device.house._set_button_state(self.device.iid, self.button_cid, pressed)
+		self.device.gateway._set_button_state(self.device.iid, self.button_cid, pressed)
 		
 	def set_led_state(self, on):
-		self.device.house._set_led_state(self.device.iid, self.led_cid, on)
+		self.device.gateway._set_led_state(self.device.iid, self.led_cid, on)
 
 
 class KeypadDevice(ControlDevice):
-	def __init__(self, area, device_spec):
-		super(KeypadDevice, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(KeypadDevice, self).__init__(ra_area, device_spec)
 		self.devtype = 'keypad'
 		self.buttons = dict()
 		for button_id in device_spec.buttons.keys():
@@ -282,25 +258,44 @@ class KeypadDevice(ControlDevice):
 		return self.get_num_buttons_pressed()
 
 	def on_user_action(self, state, refresh):
-		self.house._on_device_state_change(self.iid, state, refresh)
+		self.gateway._on_device_state_change(self.iid, state, refresh)
 
 	def get_name_for_level(self, level):
 		return 'pressed' if level > 0 else 'unpressed'
 
 
 class RemoteKeypadDevice(KeypadDevice):
-	def __init__(self, area, device_spec):
-		super(RemoteKeypadDevice, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(RemoteKeypadDevice, self).__init__(ra_area, device_spec)
 		self.devtype = 'remote'
 
 
 class RepeaterKeypadDevice(KeypadDevice):
-	def __init__(self, area, device_spec):
-		super(RepeaterKeypadDevice, self).__init__(area, device_spec)
+	def __init__(self, ra_area, device_spec):
+		super(RepeaterKeypadDevice, self).__init__(ra_area, device_spec)
 		self.devtype = 'repeater'
 
 
-def create_device_for_control(area, device_spec):
+def create_device_for_output(ra_area, output_spec):
+	# Static factory for correct OutputDevice subclass matching Lutron OutputType.
+	map_lutron_output_to_class = {
+		"INC": DimmedOutput,
+		"NON_DIM": SwitchedOutput,
+		"SYSTEM_SHADE": ShadeOutput,
+		"CCO_PULSED": ContactClosureOutput,
+		"CCO_MAINTAINED": ContactClosureOutput,
+	}
+	
+	try:
+		cls = map_lutron_output_to_class[output_spec.get_type()]
+	except: # XXX fall back on default/generic case
+		logger.error('unknown lutron device type: %s' % device_spec.get_type())
+		cls = OutputDevice
+
+	return cls(ra_area, output_spec)
+
+
+def create_device_for_control(ra_area, device_spec):
 	# Static factory for correct ControlDevice subclass matching Lutron DeviceType.
 	map_lutron_device_to_class = {
 		"SEETOUCH_KEYPAD": KeypadDevice,
@@ -317,24 +312,27 @@ def create_device_for_control(area, device_spec):
 		logger.error('unknown lutron device type: %s' % device_spec.get_type())
 		cls = ControlDevice
 
-	return cls(area, device_spec)
+	return cls(ra_area, device_spec)
 
 
-class DeviceArea(object):
+class RaArea(object):
 	# grouping container: area containing a set of devices and/or other areas
 	# (Matches Lutron's "area" concept).
 	
 	# XXX should clean up constructor arguments, deal with nested areas, and avoid
 	# needing to pass the house to nested areas. This should just take a "parent"
 	# argument.
-	def __init__(self, house, area_spec):
-		self.house = house
-		if area_spec:
-			self.iid = area_spec.iid
-			self.name = area_spec.name
-			self.members = [create_device_for_output(self, output_spec) for output_spec in area_spec.get_outputs()] + [
-						    create_device_for_control(self, device_spec) for device_spec in area_spec.get_devices()]
-			house._register_area(self)
+	# XXX that comment predates the conversion to StargateArea; not sure whether
+	# it's now more or less necessary to do the above, but it bears rethinking.
+	def __init__(self, gateway, area_spec):
+		self.gateway = gateway
+		self.house = gateway.house
+
+		self.iid = area_spec.iid
+		self.name = area_spec.name
+		self.sg_area = gateway._register_area(self)
+		self.members = [create_device_for_output(self, output_spec) for output_spec in area_spec.get_outputs()] + [
+					    create_device_for_control(self, device_spec) for device_spec in area_spec.get_devices()]
 
 	def _children_of_class(self, cls):
 		# build flat list of children
@@ -342,7 +340,7 @@ class DeviceArea(object):
 		for m in self.members:
 			if isinstance(m, cls):
 				devs.append(m)
-			if isinstance(m, DeviceArea):
+			if isinstance(m, RaArea):
 				devs.extend(m._children_of_class(cls))
 		return devs
 
@@ -362,7 +360,7 @@ class DeviceArea(object):
 		return devs
 
 	def get_all_areas(self):
-		return self._children_of_class(DeviceArea)
+		return self._children_of_class(RaArea)
 
 	def get_areas_filtered_by(self, filters):
 		areas = self.get_all_areas()
@@ -383,22 +381,22 @@ class DeviceArea(object):
 		return reduce(set.intersection, map(lambda dev: dev.get_possible_actions(), devices))
 
 
-class House(DeviceArea):
-	def __init__(self, repeater, layout):
-		super(House, self).__init__(self, None)
+class RaGateway(sg_house.StargateGateway):
+	def __init__(self, house, repeater, layout):
+		super(RaGateway, self).__init__(house, 'radiora2')
 		self.devices = {}
 		self.areas = {}
 		self.repeater = repeater
 		self.layout = layout
-		self.persist = persistence.SgPersistence('stargate.sqlite')
-		self.gateway_name = 'radiora2' # XXX allow demo.py to find us, until we become a real gateway plugin
-		
-		# build house from layout
-		self.iid = -1
-		self.name = 'Global'
-		self.members = [DeviceArea(self, area_spec) for area_spec in layout.get_areas()]
 
-		# tell repeater about the layout (just what output devices to query)
+		# build devices from layout
+		self.members = [RaArea(self, area_spec) for area_spec in layout.get_areas()]
+		
+		# synthesize root area
+		self.root_area = RaArea(self, ra_layout.Area(0, 'Root Area'))
+		self.root_area.members = self.members
+
+		# tell repeater object about the layout (which devices to cache)
 		cache = ra_repeater.OutputCache()
 		for iid in layout.get_output_ids():
 			cache.watch_output(iid)
@@ -407,43 +405,51 @@ class House(DeviceArea):
 			cache.watch_device(iid, device.get_button_component_ids(), device.get_led_component_ids())
 		cache.subscribe_to_actions(self)
 		repeater.bind_cache(cache)
-
+		
 	# public interface to clients
-	def get_device_by_iid(self, iid):
-		# note this is good for all devices: both controls and outputs
-		return self.devices[iid]
+	def get_device_by_gateway_id(self, gw_rel_id):
+		iid = int(gw_rel_id)
+		return self._get_device_by_iid(iid)
 
+# XXX needs integration with house-area concept
 	def get_devicearea_by_iid(self, iid):
 		return self.areas[iid]
 		
 	# repeater action callback
 	def on_user_action(self, iid, state, refresh):
 		logger.debug('repeater action iid %d' % iid)
-		device = self.get_device_by_iid(iid)
+		device = self._get_device_by_iid(iid)
 		device.on_user_action(state, refresh)
 	
 	# private interface for owned objects to talk to persistence layer
 	def _on_device_state_change(self, iid, state, refresh):
 		if refresh:
-			self.persist.init_device_state('radiora2', iid, state)
+			self.house.persist.init_device_state('radiora2', iid, state)
 		else:
-			self.persist.on_device_state_change('radiora2', iid, state)
+			self.house.persist.on_device_state_change('radiora2', iid, state)
 		
 	def _get_delta_since_change(self, iid):
-		return self.persist.get_delta_since_change('radiora2', iid)
+		return self.house.persist.get_delta_since_change('radiora2', iid)
 
 	def _get_action_count(self, iid, bucket):
-		return self.persist.get_action_count('radiora2', iid, bucket)
+		return self.house.persist.get_action_count('radiora2', iid, bucket)
 
 	def _get_time_in_state(self, iid, state, bucket):
-		return self.persist.get_time_in_state('radiora2', iid, state, bucket)
+		return self.house.persist.get_time_in_state('radiora2', iid, state, bucket)
 
 	# private interface for owned objects to talk to repeater
+	def _get_device_by_iid(self, iid):
+		# note this is good for all devices: both controls and outputs
+		return self.devices[iid]
+
 	def _register_device(self, device):
 		self.devices[device.iid] = device
 		
-	def _register_area(self, area):
-		self.areas[area.iid] = area
+	def _register_area(self, ra_area):
+		self.areas[ra_area.iid] = ra_area
+		# match with house area
+		sg_area = self.house.get_area_by_name(ra_area.name)
+		return sg_area
 
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)
@@ -462,4 +468,3 @@ class House(DeviceArea):
 	
 	def _set_led_state(self, iid, lid, on):
 		return self.repeater.set_led_state(iid, lid, on)
-

@@ -1,5 +1,6 @@
 # global configuration
 working_dir: ./RUN
+house_name: House the Joint
 
 logging:
     logfile: stargate.log # stargate-%(pid)d.log

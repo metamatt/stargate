@@ -11,7 +11,7 @@
 
 	<a href="{{ url_for('get_' + device.devclass, iid = device.iid) }}">{{ device.name }}</a>
 	
-	{% if device.get_level %}
+	{% if device.get_level and device.devclass == 'output' %}
 		: {{ device.get_level() }}
 	{% endif %}
 	

@@ -4,8 +4,8 @@
 
 <p>
 	Viewing 1 {{ devclass }} in
-	area <a href="{{ url_for('enumerate_devices_by_area', iid = device.area.iid) }}">{{ device.area.name }}</a>
-	(<a href="{{ url_for('enumerate_' + devclass + 's_by_area', iid = device.area.iid) }}">view all {{ devclass }}s</a>):
+	area <a href="{{ url_for('enumerate_devices_by_area', iid = device.ra_area.iid) }}">{{ device.area.name }}</a>
+	(<a href="{{ url_for('enumerate_' + devclass + 's_by_area', iid = device.ra_area.iid) }}">view all {{ devclass }}s</a>):
 	{% include 'inc/outputForm.html' %}
 </p>
 

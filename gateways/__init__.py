@@ -14,6 +14,6 @@ def load_all(sg_house, gateways_config):
 		config = gateways_config[gateway_module_name]
 		gateway = gateway_module.init(sg_house, config)
 		
-		gateway_map[gateway.gateway_name] = gateway
+		gateway_map[gateway.name] = gateway
 	
 	return gateway_map

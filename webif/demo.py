@@ -7,14 +7,14 @@ app = Flask(__name__)
 house = None
 
 # XXX need way to access this without hardcoding radiora2 package here
-import gateways.radiora2.ra_house as ra_house
+import gateways.radiora2.ra_gateway as ra_gateway
 def order_device_states(states, devclass = 'device'):
 	if devclass == 'output':
-		return ra_house.OutputDevice.order_states(states)
+		return ra_gateway.OutputDevice.order_states(states)
 	elif devclass == 'control':
-		return ra_house.ControlDevice.order_states(states)
+		return ra_gateway.ControlDevice.order_states(states)
 	else:
-		return ra_house.LutronDevice.order_states(states)
+		return ra_gateway.LutronDevice.order_states(states)
 
 
 def human_readable_timedelta(delta, text_if_none = 'unknown'):
@@ -184,7 +184,7 @@ def inject_house():
 def start(theHouse, port = None, public = False, webdebug = False):
 	# save house object for handler classes to use
 	global house
-	house = theHouse.gateways['radiora2'] if theHouse else None # XXX ignore SgHouse, deal only with ra_house.House for now
+	house = theHouse
 
 	# start webserver
 	app_args = {}
