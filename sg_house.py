@@ -49,6 +49,13 @@ class StargateDevice(object):
 	# also be able to look them up.
 	
 	# XXX: provide some idea of common type/capability information?
+	# devclass and devtype are assumed to exist by StargateArea.get_device_type_state_map();
+	# they're currently not mentioned by StargateDevice (subclasses add them in their own
+	# init and override matches_filter). Should probably pass them down to this __init__
+	# and have this matches_filter know about them.
+	#
+	# Then a lot of the general type/state stuff from LutronDevice/OutputDevice can move
+	# here, with a rethinking/cleanup of types and states themselves.
 	
 	# predefined fields that all devices must have, all subclasses must fill in
 	house = None            # StargateHouse instance
