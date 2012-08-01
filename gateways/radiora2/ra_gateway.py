@@ -161,13 +161,16 @@ class ShadeOutput(OutputDevice):
 		self.set_level(50)
 
 	def is_closed(self):
-		return self.get_level() == 0
+		return self.get_level() <= 0.5 # some slop
 	
 	def be_closed(self):
 		self.set_level(0)
 
 	def is_open(self):
-		return self.get_level() >= 100 # sometimes set to 100.01!
+		return not self.is_closed()
+
+	def is_fully_open(self):
+		return self.get_level() >= 99.5 # I've seen 99.61, 100.01... allow some slop
 
 	def be_open(self):
 		self.set_level(100)
