@@ -57,26 +57,9 @@ def enumerate_controls(filterdesc):
 
 @app.route('/control/<int:dev_id>', methods = ['POST'])
 def activate_control(dev_id):
-	params = request.form
-	button_id = params['button_id']
+	params = request.values
+	button_id = int(params['button_id'])
 	action = params['action']
-	control = house.get_device_by_id(dev_id)
-	button = control.get_button(button_id)
-	if action == 'press':
-		button.set_button_state(True)
-	elif action == 'release':
-		button.set_button_state(False)
-	elif action == 'pulse':
-		button.set_button_state(True)
-		time.sleep(0.2)
-		button.set_button_state(False)
-	# XXX should make this respond to async operation when it completes; for now just wait a bit
-	# and show the device details page
-	time.sleep(0.3)
-	return redirect(url_for('get_control', dev_id = dev_id))
-
-@app.route('/control/<int:dev_id>/button/<int:button_id>/<action>')
-def activate_control_hack(dev_id, button_id, action):
 	control = house.get_device_by_id(dev_id)
 	button = control.get_button(button_id)
 	if action == 'press':
@@ -99,18 +82,20 @@ def enumerate_outputs(filterdesc):
 	outputs = house.get_devices_filtered_by(devfilter)
 	return render_template('outputList.html', devices = outputs, devclass = 'output', active_filter = devfilter)
 
-# XXX should share code between these, type check, redirect to canonical url?
 @app.route('/control/<int:dev_id>')
 def get_control(dev_id):
+	# XXX hack to allow calling activate_control with a GET request, for easy hyperlinking
+	if request.values.has_key('action'):
+		return activate_control(dev_id)
 	# XXX should type check? share code?
 	control = house.get_device_by_id(dev_id)
 	return render_template('output.html', device = control, devclass = 'control')
 
+# generic device lookup redirects to canonical URL for device, named by class
 @app.route('/device/<int:dev_id>')
 def get_device(dev_id):
 	device = house.get_device_by_id(dev_id)
-	# XXX should type check and redirect?
-	return render_template('output.html', device = device, devclass = 'device')
+	return redirect('/%s/%d' % (device.devclass, dev_id))
 
 @app.route('/output/<int:dev_id>')
 def get_output(dev_id):
@@ -138,7 +123,7 @@ def set_outputs_to_state():
 	params = request.form
 	state = params['state']
 	dev_ids = map(int, params['outputs'].split(','))
-	for dev_id in dev_id:
+	for dev_id in dev_ids:
 		output = house.get_device_by_id(dev_id)
 		output.go_to_state(state)
 	# XXX should make this respond to async operation when it completes; for now just wait a bit

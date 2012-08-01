@@ -17,7 +17,7 @@
 				{% if button.has_led() %}
 					{{ '( O )' if button.get_led_state() else '( . )' }}
 				{% endif %}
-				<a href="{{ url_for('activate_control_hack', dev_id = device.device_id, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).label }}</a>
+				<a href="{{ url_for('get_control', dev_id = device.device_id, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).label }}</a>
 				{{ '(pressed)' if button.get_button_state() else '' }}
 			</li>
 		{% endfor %}
