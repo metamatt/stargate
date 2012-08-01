@@ -179,6 +179,10 @@ def enumerate_controls_by_area(area_id, filterdesc):
 	return render_template('outputList.html', area_filter = area, devices = controls, active_filter = devfilter)
 
 
+@app.errorhandler(404)
+def not_found(error):
+	return render_template('error.html', request_path = request.path, referrer = request.referrer), 404
+
 @app.context_processor
 def inject_house():
 	return dict(house = house)

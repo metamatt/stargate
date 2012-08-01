@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock title %}
+{% block content %}
+
+<p>
+Sorry: we could not recognize your request for <i>{{ request_path }}</i>. Why not start over from the <a href=/>top</a>?
+</p>
+
+{% if referrer %}
+
+	<p>
+	You can also go <a href="{{ referrer }}">back where you came from</a>.
+	</p>
+
+{% endif %}
+
+{% endblock content %}
