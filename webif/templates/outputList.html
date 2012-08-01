@@ -5,25 +5,25 @@
 <p>
 	{{ count_list_items(devices, devclass) }}
 	{% if area_filter %}
-		in area <a href="{{ url_for('enumerate_devices_by_area', iid = area_filter.iid) }}">{{ area_filter.name }}</a>
+		in area <a href="{{ url_for('enumerate_devices_by_area', area_id = area_filter.area_id) }}">{{ area_filter.name }}</a>
 	{% endif %}
 	{% include 'inc/filterbar.html' %}
 </p>
-{% for device_group in devices | groupby('ra_area') | sort(attribute = 'grouper.name') %}
+{% for device_group in devices | groupby('area') | sort(attribute = 'grouper.name') %}
 	{% set area = device_group.grouper %}
 	{% if not area_filter %}
 		<!-- redundant when scoped to a single area -->
-		In area <a href="{{ url_for('enumerate_' + devclass + 's_by_area', iid = area.iid) }}">{{ area.name }}</a>
+		In area <a href="{{ url_for('enumerate_' + devclass + 's_by_area', area_id = area.area_id) }}">{{ area.name }}</a>
 	{% endif %}
 	<ul>
 		{% for type_group in device_group.list | groupby('devclass') %}
-			{% set commonActionForm = 'commonActions' + area.iid|string + type_group.grouper %}
+			{% set commonActionForm = 'commonActions' + area.area_id|string + type_group.grouper %}
 			<form name="{{ commonActionForm }}" action="{{ url_for('set_outputs_to_state') }}" method="post">
 				{{ count_list_items(type_group.list, type_group.grouper) }}
 			
-				{% set common_actions = house.get_supported_actions(type_group.list) | order_device_states(devclass = devclass) %}
+				{% set common_actions = house.get_available_common_actions(type_group.list) | order_device_states(devclass = devclass) %}
 				{% if common_actions|length %}
-					<input type="hidden" name="outputs" value="{{ type_group.list | join(',', attribute = 'iid') }}">
+					<input type="hidden" name="outputs" value="{{ type_group.list | join(',', attribute = 'device_id') }}">
 					<input type="hidden" name="state" value="">
 					(set all to:
 					{% for action in common_actions %}

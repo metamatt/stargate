@@ -36,6 +36,15 @@ class LutronDevice(sg_house.StargateDevice):
 		self._possible_states = None
 		self._possible_actions = None
 		self.gateway._register_device(self)
+		
+	def matches_filter(self, devfilter):
+		if devfilter.devclass is not None and devfilter.devclass != self.devclass:
+			return False
+		if devfilter.devtype is not None and devfilter.devtype != self.devtype:
+			return False
+		if devfilter.devstate is not None and not self.is_in_state(devfilter.devstate):
+			return False
+		return True
 
 	def is_in_state(self, state):
 		# special case "age=NNN"
@@ -324,6 +333,8 @@ class RaArea(object):
 	# argument.
 	# XXX that comment predates the conversion to StargateArea; not sure whether
 	# it's now more or less necessary to do the above, but it bears rethinking.
+	# XXX this whole class is almost vestigial now; all it does is create the right
+	# hierarchy of StargateHouse objects.
 	def __init__(self, gateway, area_spec):
 		self.gateway = gateway
 		self.house = gateway.house
@@ -334,56 +345,10 @@ class RaArea(object):
 		self.members = [create_device_for_output(self, output_spec) for output_spec in area_spec.get_outputs()] + [
 					    create_device_for_control(self, device_spec) for device_spec in area_spec.get_devices()]
 
-	def _children_of_class(self, cls):
-		# build flat list of children
-		devs = []
-		for m in self.members:
-			if isinstance(m, cls):
-				devs.append(m)
-			if isinstance(m, RaArea):
-				devs.extend(m._children_of_class(cls))
-		return devs
-
-	# filters
-	def has_device_in_state(self, state):
-		return any(dev.is_in_state(state) for dev in self.get_all_devices())
-
-	# interface to enumerate contained devices and areas
-	def get_all_devices(self, devclass = 'device'):
-		class_for_devclass = { 'control': ControlDevice, 'output': OutputDevice, 'device': LutronDevice }
-		return self._children_of_class(class_for_devclass[devclass])
-
-	def get_devices_filtered_by(self, filters = [], devclass = 'device'):
-		devs = self.get_all_devices(devclass)
-		for state in filters:
-			devs = filter(lambda dev: dev.is_in_state(state), devs)
-		return devs
-
-	def get_all_areas(self):
-		return self._children_of_class(RaArea)
-
-	def get_areas_filtered_by(self, filters):
-		areas = self.get_all_areas()
-		for state in filters:
-			areas = filter(lambda area: area.has_device_in_state(state), areas)
-		return areas
-
-	def get_device_type_state_map(self, devclass = 'device'):
-		possible = { 'all': set() }
-		for dev in self.get_all_devices(devclass):
-			if not possible.has_key(dev.devtype):
-				possible[dev.devtype] = set()
-			possible[dev.devtype].update(dev.get_possible_states())
-		return possible
-
-	@staticmethod
-	def get_supported_actions(devices):
-		return reduce(set.intersection, map(lambda dev: dev.get_possible_actions(), devices))
-
 
 class RaGateway(sg_house.StargateGateway):
-	def __init__(self, house, repeater, layout):
-		super(RaGateway, self).__init__(house, 'radiora2')
+	def __init__(self, house, gateway_instance_name, repeater, layout):
+		super(RaGateway, self).__init__(house, gateway_instance_name)
 		self.devices = {}
 		self.areas = {}
 		self.repeater = repeater
@@ -393,6 +358,7 @@ class RaGateway(sg_house.StargateGateway):
 		self.members = [RaArea(self, area_spec) for area_spec in layout.get_areas()]
 		
 		# synthesize root area
+		# XXX this is vestigial; not used for anything any more; is it useful or should we delete it?
 		self.root_area = RaArea(self, ra_layout.Area(0, 'Root Area'))
 		self.root_area.members = self.members
 
@@ -406,42 +372,19 @@ class RaGateway(sg_house.StargateGateway):
 		cache.subscribe_to_actions(self)
 		repeater.bind_cache(cache)
 		
-	# public interface to clients
-	def get_device_by_gateway_id(self, gw_rel_id):
-		iid = int(gw_rel_id)
-		return self._get_device_by_iid(iid)
+	# public interface to StargateHouse
+	def get_device_by_gateway_id(self, gateway_devid):
+		assert isinstance(gateway_devid, int)
+		iid = int(gateway_devid)
+		return self.devices[iid]
 
-# XXX needs integration with house-area concept
-	def get_devicearea_by_iid(self, iid):
-		return self.areas[iid]
-		
 	# repeater action callback
 	def on_user_action(self, iid, state, refresh):
 		logger.debug('repeater action iid %d' % iid)
-		device = self._get_device_by_iid(iid)
+		device = self.devices[iid]
 		device.on_user_action(state, refresh)
 	
-	# private interface for owned objects to talk to persistence layer
-	def _on_device_state_change(self, iid, state, refresh):
-		if refresh:
-			self.house.persist.init_device_state('radiora2', iid, state)
-		else:
-			self.house.persist.on_device_state_change('radiora2', iid, state)
-		
-	def _get_delta_since_change(self, iid):
-		return self.house.persist.get_delta_since_change('radiora2', iid)
-
-	def _get_action_count(self, iid, bucket):
-		return self.house.persist.get_action_count('radiora2', iid, bucket)
-
-	def _get_time_in_state(self, iid, state, bucket):
-		return self.house.persist.get_time_in_state('radiora2', iid, state, bucket)
-
-	# private interface for owned objects to talk to repeater
-	def _get_device_by_iid(self, iid):
-		# note this is good for all devices: both controls and outputs
-		return self.devices[iid]
-
+	# private interface for owned objects to populate node tree
 	def _register_device(self, device):
 		self.devices[device.iid] = device
 		
@@ -451,6 +394,23 @@ class RaGateway(sg_house.StargateGateway):
 		sg_area = self.house.get_area_by_name(ra_area.name)
 		return sg_area
 
+	# private interface for owned objects to talk to persistence layer
+	def _on_device_state_change(self, iid, state, refresh):
+		if refresh:
+			self.house.persist.init_device_state(self.gateway_id, iid, state)
+		else:
+			self.house.persist.on_device_state_change(self.gateway_id, iid, state)
+		
+	def _get_delta_since_change(self, iid):
+		return self.house.persist.get_delta_since_change(self.gateway_id, iid)
+
+	def _get_action_count(self, iid, bucket):
+		return self.house.persist.get_action_count(self.gateway_id, iid, bucket)
+
+	def _get_time_in_state(self, iid, state, bucket):
+		return self.house.persist.get_time_in_state(self.gateway_id, iid, state, bucket)
+
+	# private interface for owned objects to talk to repeater
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)
 	

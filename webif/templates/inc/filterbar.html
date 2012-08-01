@@ -1,22 +1,28 @@
 matching filter:
-{% set filterscope = area if area else house %}
-{% set devclass = devclass if devclass else 'device' %}
-{% macro decorate_active(name) %}
-	{% if name in active_filters or (name == 'all' and active_filters == []) %}
-		<b>{{ name }}</b>
+
+{% macro decorate_active(devtype, devstate = None) %}
+    {% set state_for_display = devstate if devstate else devtype %}
+    {% set state_for_link = './' + devtype + (':' + devstate if devstate else '') %}
+	{% if (devtype == active_filter.devtype and devstate == active_filter.devstate) or (devtype == 'all' and active_filter.devtype == None) %}
+		<b>{{ state_for_display }}</b>
 	{% else %}
-		<a href="{{ name }}">{{ name }}</a>
+		<a href="{{ state_for_link }}">{{ state_for_display }}</a>
 	{% endif %}
 {% endmacro %}
 
+{% set filterscope = area if area else house %}
+{% set devclass = active_filter.devclass %}
 {% set type_state_map = filterscope.get_device_type_state_map(devclass = devclass) %}
+
 {% for type in type_state_map | order_device_states(devclass = devclass) %}
-{% set states = type_state_map[type] | order_device_states(devclass = devclass) %}
 	{{ decorate_active(type) }}
 
-	{% if states|length %}({% endif %}
-	{% for state in states %}
-		{{ decorate_active(state) }}
-	{% endfor %}
-	{% if states|length %}){% endif %}
+	{% set states = type_state_map[type] | order_device_states(devclass = devclass) %}
+	{% if states|length %}
+		(
+		{% for state in states %}
+			{{ decorate_active(type, state) }}
+		{% endfor %}
+		)
+	{% endif %}
 {% endfor %}

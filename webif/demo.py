@@ -48,19 +48,19 @@ app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
 def root():
 	return render_template('index.html')
 
-@app.route('/controls/', defaults = {'filterlist': 'all'})
-@app.route('/controls/<filterlist>')
-def enumerate_controls(filterlist):
-	filters = filterlist.split(',')
-	controls = house.get_devices_filtered_by(filters, devclass = 'control')
-	return render_template('outputList.html', devices = controls, devclass = 'control', active_filters = filters)
+@app.route('/controls/', defaults = {'filterdesc': ''})
+@app.route('/controls/<filterdesc>')
+def enumerate_controls(filterdesc):
+	devfilter = house.parse_devfilter_description(devclass = 'control', descriptor = filterdesc)
+	controls = house.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', devices = controls, devclass = 'control', active_filter = devfilter)
 
-@app.route('/control/<int:iid>', methods = ['POST'])
-def activate_control(iid):
+@app.route('/control/<int:dev_id>', methods = ['POST'])
+def activate_control(dev_id):
 	params = request.form
 	button_id = params['button_id']
 	action = params['action']
-	control = house.get_device_by_iid(iid)
+	control = house.get_device_by_id(dev_id)
 	button = control.get_button(button_id)
 	if action == 'press':
 		button.set_button_state(True)
@@ -73,11 +73,11 @@ def activate_control(iid):
 	# XXX should make this respond to async operation when it completes; for now just wait a bit
 	# and show the device details page
 	time.sleep(0.3)
-	return redirect(url_for('get_control', iid = iid))
+	return redirect(url_for('get_control', dev_id = dev_id))
 
-@app.route('/control/<int:iid>/button/<int:button_id>/<action>')
-def activate_control_hack(iid, button_id, action):
-	control = house.get_device_by_iid(iid)
+@app.route('/control/<int:dev_id>/button/<int:button_id>/<action>')
+def activate_control_hack(dev_id, button_id, action):
+	control = house.get_device_by_id(dev_id)
 	button = control.get_button(button_id)
 	if action == 'press':
 		button.set_button_state(True)
@@ -90,38 +90,38 @@ def activate_control_hack(iid, button_id, action):
 	# XXX should make this respond to async operation when it completes; for now just wait a bit
 	# and show the device details page
 	time.sleep(0.3)
-	return redirect(url_for('get_control', iid = iid))
+	return redirect(url_for('get_control', dev_id = dev_id))
 
-@app.route('/outputs/', defaults = {'filterlist': 'all'})
-@app.route('/outputs/<filterlist>')
-def enumerate_outputs(filterlist):
-	filters = filterlist.split(',')
-	outputs = house.get_devices_filtered_by(filters, devclass = 'output')
-	return render_template('outputList.html', devices = outputs, devclass = 'output', active_filters = filters)
+@app.route('/outputs/', defaults = {'filterdesc': ''})
+@app.route('/outputs/<filterdesc>')
+def enumerate_outputs(filterdesc):
+	devfilter = house.parse_devfilter_description(devclass = 'output', descriptor = filterdesc)
+	outputs = house.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', devices = outputs, devclass = 'output', active_filter = devfilter)
 
 # XXX should share code between these, type check, redirect to canonical url?
-@app.route('/control/<int:iid>')
-def get_control(iid):
+@app.route('/control/<int:dev_id>')
+def get_control(dev_id):
 	# XXX should type check? share code?
-	control = house.get_device_by_iid(iid)
+	control = house.get_device_by_id(dev_id)
 	return render_template('output.html', device = control, devclass = 'control')
 
-@app.route('/device/<int:iid>')
-def get_device(iid):
-	device = house.get_device_by_iid(iid)
+@app.route('/device/<int:dev_id>')
+def get_device(dev_id):
+	device = house.get_device_by_id(dev_id)
 	# XXX should type check and redirect?
 	return render_template('output.html', device = device, devclass = 'device')
 
-@app.route('/output/<int:iid>')
-def get_output(iid):
+@app.route('/output/<int:dev_id>')
+def get_output(dev_id):
 	# XXX should type check? share code?
-	output = house.get_device_by_iid(iid)
+	output = house.get_device_by_id(dev_id)
 	return render_template('output.html', device = output, devclass = 'output')
 
-@app.route('/output/<int:iid>', methods = ['POST'])
-def set_output(iid):
+@app.route('/output/<int:dev_id>', methods = ['POST'])
+def set_output(dev_id):
 	params = request.form
-	output = house.get_device_by_iid(iid)
+	output = house.get_device_by_id(dev_id)
 	state = params['state']
 	if state == 'level':
 		level = float(params['level'])
@@ -131,51 +131,51 @@ def set_output(iid):
 	# XXX should make this respond to async operation when it completes; for now just wait a bit
 	# and show the device details page
 	time.sleep(0.3)
-	return redirect(url_for('get_output', iid = iid))
+	return redirect(url_for('get_output', dev_id = dev_id))
 
 @app.route('/output/multi/to_state', methods = ['POST'])
 def set_outputs_to_state():
 	params = request.form
 	state = params['state']
-	iids = map(int, params['outputs'].split(','))
-	for iid in iids:
-		output = house.get_device_by_iid(iid)
+	dev_ids = map(int, params['outputs'].split(','))
+	for dev_id in dev_id:
+		output = house.get_device_by_id(dev_id)
 		output.go_to_state(state)
 	# XXX should make this respond to async operation when it completes; for now just wait a bit
 	# hack: show the page for the outputs in the area containing the last device, filtered by device type
-	time.sleep(0.2 * len(iids))
-	return redirect(url_for('enumerate_outputs_by_area', iid = output.area.iid, filterlist = output.devtype))
+	time.sleep(0.2 * len(dev_ids))
+	return redirect(url_for('enumerate_outputs_by_area', area_id = output.area.area_id, filterdesc = output.devtype))
 
-@app.route('/areas/', defaults = {'filterlist': 'all'})
-@app.route('/areas/<filterlist>')
-def enumerate_areas(filterlist):
-	filters = filterlist.split(',')
-	areas = house.get_areas_filtered_by(filters)
-	return render_template('areaList.html', areas = areas, active_filters = filters)
+@app.route('/areas/', defaults = {'filterdesc': ''})
+@app.route('/areas/<filterdesc>')
+def enumerate_areas(filterdesc):
+	devfilter = house.parse_devfilter_description(descriptor = filterdesc)
+	areas = house.get_areas_filtered_by(devfilter)
+	return render_template('areaList.html', areas = areas, active_filter = devfilter)
 
-@app.route('/area/<int:iid>/outputs/', defaults = {'filterlist': 'all'})
-@app.route('/area/<int:iid>/outputs/<filterlist>')
-def enumerate_outputs_by_area(iid, filterlist):
-	area = house.get_devicearea_by_iid(iid)
-	filters = filterlist.split(',')
-	outputs = area.get_devices_filtered_by(filters, devclass = 'output')
-	return render_template('outputList.html', area_filter = area, devices = outputs, devclass = 'output', active_filters = filters)
+@app.route('/area/<int:area_id>/outputs/', defaults = {'filterdesc': ''})
+@app.route('/area/<int:area_id>/outputs/<filterdesc>')
+def enumerate_outputs_by_area(area_id, filterdesc):
+	area = house.get_area_by_id(area_id)
+	devfilter = house.parse_devfilter_description(devclass = 'output', descriptor = filterdesc)
+	outputs = area.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', area_filter = area, devices = outputs, devclass = 'output', active_filter = devfilter)
 
-@app.route('/area/<int:iid>/controls/', defaults = {'filterlist': 'all'})
-@app.route('/area/<int:iid>/outputs/<filterlist>')
-def enumerate_controls_by_area(iid, filterlist):
-	area = house.get_devicearea_by_iid(iid)
-	filters = filterlist.split(',')
-	controls = area.get_devices_filtered_by(filters, devclass = 'control')
-	return render_template('outputList.html', area_filter = area, devices = controls, devclass = 'control', active_filters = filters)
+@app.route('/area/<int:area_id>/controls/', defaults = {'filterdesc': ''})
+@app.route('/area/<int:area_id>/outputs/<filterdesc>')
+def enumerate_controls_by_area(area_id, filterdesc):
+	area = house.get_area_by_id(area_id)
+	devfilter = house.parse_devfilter_description(devclass = 'control', descriptor = filterdesc)
+	controls = area.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', area_filter = area, devices = controls, devclass = 'control', active_filter = devfilter)
 
-@app.route('/area/<int:iid>/devices/', defaults = {'filterlist': 'all'})
-@app.route('/area/<int:iid>/devices/<filterlist>')
-def enumerate_devices_by_area(iid, filterlist):
-	area = house.get_devicearea_by_iid(iid)
-	filters = filterlist.split(',')
-	devices = area.get_devices_filtered_by(filters)
-	return render_template('outputList.html', area_filter = area, devices = devices, devclass = 'device', active_filters = filters)
+@app.route('/area/<int:area_id>/devices/', defaults = {'filterdesc': ''})
+@app.route('/area/<int:area_id>/devices/<filterdesc>')
+def enumerate_devices_by_area(area_id, filterdesc):
+	area = house.get_area_by_id(area_id)
+	devfilter = house.parse_devfilter_description(descriptor = filterdesc)
+	devices = area.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', area_filter = area, devices = devices, devclass = 'device', active_filter = devfilter)
 
 @app.context_processor
 def inject_house():

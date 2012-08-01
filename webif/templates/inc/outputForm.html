@@ -1,5 +1,5 @@
 {% set outputForm = 'output%d' % device.iid %}
-<form name="{{ outputForm }}" action="{{ url_for('set_output', iid = device.iid) }}" method="post">
+<form name="{{ outputForm }}" action="{{ url_for('set_output', dev_id = device.device_id) }}" method="post">
 	{% macro emit_set_to_level_link(name) -%}
 		<a href="#" onclick="document.{{ outputForm }}.elements['state'].value='level'; document.{{ outputForm }}.submit(); return false">{{ name }}</a>
 	{%- endmacro %}
@@ -9,7 +9,7 @@
 	
 	<input type="hidden" name="state" value="">
 
-	<a href="{{ url_for('get_' + device.devclass, iid = device.iid) }}">{{ device.name }}</a>
+	<a href="{{ url_for('get_' + device.devclass, dev_id = device.device_id) }}">{{ device.name }}</a>
 	
 	{% if device.get_level and device.devclass == 'output' %}
 		: {{ device.get_level() }}

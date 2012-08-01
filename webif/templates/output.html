@@ -4,8 +4,8 @@
 
 <p>
 	Viewing 1 {{ devclass }} in
-	area <a href="{{ url_for('enumerate_devices_by_area', iid = device.ra_area.iid) }}">{{ device.area.name }}</a>
-	(<a href="{{ url_for('enumerate_' + devclass + 's_by_area', iid = device.ra_area.iid) }}">view all {{ devclass }}s</a>):
+	area <a href="{{ url_for('enumerate_devices_by_area', area_id = device.area.area_id) }}">{{ device.area.name }}</a>
+	(<a href="{{ url_for('enumerate_' + devclass + 's_by_area', area_id = device.area.area_id) }}">view all {{ devclass }}s</a>):
 	{% include 'inc/outputForm.html' %}
 </p>
 
@@ -17,7 +17,7 @@
 				{% if button.has_led() %}
 					{{ '( O )' if button.get_led_state() else '( . )' }}
 				{% endif %}
-				<a href="{{ url_for('activate_control_hack', iid = device.iid, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).label }}</a>
+				<a href="{{ url_for('activate_control_hack', dev_id = device.device_id, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).label }}</a>
 				{{ '(pressed)' if button.get_button_state() else '' }}
 			</li>
 		{% endfor %}

@@ -50,33 +50,39 @@ class SgPersistence(object):
 		self._lock = threading.RLock()
 
 	# public interface
-	def get_device_id(self, host_system_id, host_device_id):
+	# XXX: should public methods work directly on sg_devid instead of (gateway_id, gateway_devid) pairs?
+	def get_device_id(self, gateway_id, gateway_device_id):
 		with self._lock:
 			c = self._cursor
-			c.execute('SELECT sg_device_id FROM device_map WHERE host_system_id=? AND host_device_id=?', (host_system_id, host_device_id))
+			c.execute('SELECT sg_device_id FROM device_map WHERE gateway_id=? AND gateway_device_id=?', (gateway_id, gateway_device_id))
 			row = c.fetchone()
 			if row:
-				result = row[0]
+				dev_id = row[0]
 			else:
-				c.execute('INSERT INTO device_map VALUES(?,?,NULL)', (host_system_id, host_device_id))
-				result = c.lastrowid
+				c.execute('INSERT INTO device_map VALUES(?,?,NULL)', (gateway_id, gateway_device_id))
+				dev_id = c.lastrowid
 				self._commit()
-			return result
-		
-	def init_device_state(self, host_system_id, host_device_id, state):
+			return dev_id
+	
+	def get_area_id(self, area_id):
+		# XXX: we reuse and abuse the device_map table for areas as well; that's the easiest way to
+		# get non-overlapping ids (which isn't strictly necessary but seems like good practice)
+		return self.get_device_id('__area__', area_id)
+
+	def init_device_state(self, gateway_id, gateway_device_id, state):
 		# This is a way of updating the tables used by on_device_state_change for events missed when we weren't running
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(host_system_id, host_device_id)
+			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			current_ts = datetime.datetime.now()
 			c.execute('UPDATE device_status SET unchanged_since_ts = ?, last_state = ? WHERE sg_device_id = ?', (current_ts.isoformat(), state, dev_id))
 			self._commit()
 
-	def on_device_state_change(self, host_system_id, host_device_id, state):
+	def on_device_state_change(self, gateway_id, gateway_device_id, state):
 		# XXX TODO: handle partial-on states (on_details)
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(host_system_id, host_device_id)
+			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			# query device previous state
 			c.execute('SELECT last_state FROM device_status WHERE sg_device_id = ?', (dev_id, ))
 			row = c.fetchone()
@@ -106,31 +112,31 @@ class SgPersistence(object):
 			# commit
 			self._commit()
 		
-	def checkpoint_device_state(self, host_system_id, host_device_id):
+	def checkpoint_device_state(self, gateway_id, gateway_device_id):
 		# This is a way of updating the tables used by on_device_state_change for time passing without changes while we are running
 		# XXX TODO, along with bucket rollover
 		with self._lock:
 			pass
 		
-	def get_delta_since_change(self, host_system_id, host_device_id):
+	def get_delta_since_change(self, gateway_id, gateway_device_id):
 		# get time (in seconds) since device registered a change, or None if not known (not since startup)
 		with self._lock:
-			dev_id = self.get_device_id(host_system_id, host_device_id)
+			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			delta, ts_current = self._get_device_change_delta(dev_id, True) # allow timestamp reuse across restarts
 			return delta
 	
-	def get_action_count(self, host_system_id, host_device_id, bucket):
+	def get_action_count(self, gateway_id, gateway_device_id, bucket):
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(host_system_id, host_device_id)
+			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			history = self._get_history_bucket(dev_id, bucket)
 			return history['num_changes']
 		
-	def get_time_in_state(self, host_system_id, host_device_id, state, bucket):
+	def get_time_in_state(self, gateway_id, gateway_device_id, state, bucket):
 		# state: boolean (anything evaluating true for on, false for off)
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(host_system_id, host_device_id)
+			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			history = self._get_history_bucket(dev_id, bucket)
 			seconds_in_state = history['on_time' if state else 'off_time']
 			# That counts only up to the last change; also add time from then till now if it's still in that state.
@@ -216,9 +222,9 @@ class SgPersistence(object):
 		CREATE TABLE schema_version (object STRING PRIMARY KEY, version INTEGER NOT NULL);
 		INSERT INTO schema_version VALUES('stargate', %d);
 
-		-- map from IDs used by rest of Stargate (name of automation system, and id relative only to that host) to unique integer 'sg_device_id' used by following tables
-		CREATE TABLE device_map (host_system_id STRING NOT NULL, host_device_id STRING NOT NULL, sg_device_id INTEGER PRIMARY KEY AUTOINCREMENT);
-		CREATE INDEX device_map_index ON device_map(host_system_id, host_device_id);
+		-- map from IDs used by rest of Stargate (gateway name, and id relative only to that gateway) to unique integer 'sg_device_id' used by following tables
+		CREATE TABLE device_map (gateway_id STRING NOT NULL, gateway_device_id STRING NOT NULL, sg_device_id INTEGER PRIMARY KEY AUTOINCREMENT);
+		CREATE INDEX device_map_index ON device_map(gateway_id, gateway_device_id);
 
 		-- device status for time-in-state tracking
 		-- last_seen_event_ts: last time we saw device change (persists across restart, there may have been newer changes we didn't see) -- useful to say 'last known event''
@@ -263,7 +269,7 @@ def main():
 	print id
 	id = p.get_device_id('lutron', '24')
 	print id
-	p.fastforward_device_state('lutron', '24', 0)
+	p.init_device_state('lutron', '24', 0)
 	time.sleep(0.777) # untracked time
 	p.on_device_state_change('lutron', '24', 1)
 	time.sleep(3.5) # on time

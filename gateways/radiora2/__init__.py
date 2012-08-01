@@ -6,7 +6,7 @@ import ra_gateway
 import ra_layout
 import ra_repeater
 
-def init(house, gateway_config):
+def init(house, instance_name, gateway_config):
 	repeater_config = gateway_config['repeater']
 	layout = ra_layout.RaLayout(ignore_devices = repeater_config['layout']['ignore_keypads'])
 	if repeater_config.has_key('cached_database'):
@@ -18,4 +18,4 @@ def init(house, gateway_config):
 	repeater = ra_repeater.RaRepeater()
 	repeater.connect(repeater_config['hostname'], repeater_config['username'], repeater_config['password'])
 
-	return ra_gateway.RaGateway(house, repeater, layout)
+	return ra_gateway.RaGateway(house, instance_name, repeater, layout)
