@@ -6,7 +6,7 @@ from flask import Flask, request, render_template, redirect, url_for
 app = Flask(__name__)
 house = None
 
-# XXX need way to access this without hardcoding radiora2 package here
+# XXX need to extend this concept beyond radiora2
 import gateways.radiora2.ra_gateway as ra_gateway
 def order_device_states(states, devclass = 'device'):
 	if devclass == 'output':
@@ -48,12 +48,31 @@ app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
 def root():
 	return render_template('index.html')
 
+# generic device lookup redirects to canonical URL for device, named by class
+@app.route('/device/<int:dev_id>')
+def get_device(dev_id):
+	device = house.get_device_by_id(dev_id)
+	return redirect(url_for('get_%s' % device.devclass, dev_id = dev_id))
+
+#####################
+# Controls
+################
+
 @app.route('/controls/', defaults = {'filterdesc': ''})
 @app.route('/controls/<filterdesc>')
 def enumerate_controls(filterdesc):
 	devfilter = house.parse_devfilter_description(devclass = 'control', descriptor = filterdesc)
 	controls = house.get_devices_filtered_by(devfilter)
-	return render_template('outputList.html', devices = controls, devclass = 'control', active_filter = devfilter)
+	return render_template('outputList.html', devices = controls, active_filter = devfilter)
+
+@app.route('/control/<int:dev_id>')
+def get_control(dev_id):
+	# XXX hack to allow calling activate_control with a GET request, for easy hyperlinking
+	if request.values.has_key('action'):
+		return activate_control(dev_id)
+	control = house.get_device_by_id(dev_id)
+	assert control.devclass == 'control'
+	return render_template('output.html', device = control)
 
 @app.route('/control/<int:dev_id>', methods = ['POST'])
 def activate_control(dev_id):
@@ -75,33 +94,22 @@ def activate_control(dev_id):
 	time.sleep(0.3)
 	return redirect(url_for('get_control', dev_id = dev_id))
 
+#####################
+# Outputs
+################
+
 @app.route('/outputs/', defaults = {'filterdesc': ''})
 @app.route('/outputs/<filterdesc>')
 def enumerate_outputs(filterdesc):
 	devfilter = house.parse_devfilter_description(devclass = 'output', descriptor = filterdesc)
 	outputs = house.get_devices_filtered_by(devfilter)
-	return render_template('outputList.html', devices = outputs, devclass = 'output', active_filter = devfilter)
-
-@app.route('/control/<int:dev_id>')
-def get_control(dev_id):
-	# XXX hack to allow calling activate_control with a GET request, for easy hyperlinking
-	if request.values.has_key('action'):
-		return activate_control(dev_id)
-	# XXX should type check? share code?
-	control = house.get_device_by_id(dev_id)
-	return render_template('output.html', device = control, devclass = 'control')
-
-# generic device lookup redirects to canonical URL for device, named by class
-@app.route('/device/<int:dev_id>')
-def get_device(dev_id):
-	device = house.get_device_by_id(dev_id)
-	return redirect('/%s/%d' % (device.devclass, dev_id))
+	return render_template('outputList.html', devices = outputs, active_filter = devfilter)
 
 @app.route('/output/<int:dev_id>')
 def get_output(dev_id):
-	# XXX should type check? share code?
 	output = house.get_device_by_id(dev_id)
-	return render_template('output.html', device = output, devclass = 'output')
+	assert control.devclass == 'output'
+	return render_template('output.html', device = output)
 
 @app.route('/output/<int:dev_id>', methods = ['POST'])
 def set_output(dev_id):
@@ -131,6 +139,10 @@ def set_outputs_to_state():
 	time.sleep(0.2 * len(dev_ids))
 	return redirect(url_for('enumerate_outputs_by_area', area_id = output.area.area_id, filterdesc = output.devtype))
 
+#####################
+# Areas
+################
+
 @app.route('/areas/', defaults = {'filterdesc': ''})
 @app.route('/areas/<filterdesc>')
 def enumerate_areas(filterdesc):
@@ -138,13 +150,25 @@ def enumerate_areas(filterdesc):
 	areas = house.get_areas_filtered_by(devfilter)
 	return render_template('areaList.html', areas = areas, active_filter = devfilter)
 
+@app.route('/area/<int:area_id>')
+def get_area(area_id):
+	return redirect(url_for('enumerate_devices_by_area'), area_id = area_id)
+
+@app.route('/area/<int:area_id>/devices/', defaults = {'filterdesc': ''})
+@app.route('/area/<int:area_id>/devices/<filterdesc>')
+def enumerate_devices_by_area(area_id, filterdesc):
+	area = house.get_area_by_id(area_id)
+	devfilter = house.parse_devfilter_description(descriptor = filterdesc) # XXX devclass = 'device'
+	devices = area.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', area_filter = area, devices = devices, active_filter = devfilter)
+
 @app.route('/area/<int:area_id>/outputs/', defaults = {'filterdesc': ''})
 @app.route('/area/<int:area_id>/outputs/<filterdesc>')
 def enumerate_outputs_by_area(area_id, filterdesc):
 	area = house.get_area_by_id(area_id)
 	devfilter = house.parse_devfilter_description(devclass = 'output', descriptor = filterdesc)
 	outputs = area.get_devices_filtered_by(devfilter)
-	return render_template('outputList.html', area_filter = area, devices = outputs, devclass = 'output', active_filter = devfilter)
+	return render_template('outputList.html', area_filter = area, devices = outputs, active_filter = devfilter)
 
 @app.route('/area/<int:area_id>/controls/', defaults = {'filterdesc': ''})
 @app.route('/area/<int:area_id>/outputs/<filterdesc>')
@@ -152,19 +176,13 @@ def enumerate_controls_by_area(area_id, filterdesc):
 	area = house.get_area_by_id(area_id)
 	devfilter = house.parse_devfilter_description(devclass = 'control', descriptor = filterdesc)
 	controls = area.get_devices_filtered_by(devfilter)
-	return render_template('outputList.html', area_filter = area, devices = controls, devclass = 'control', active_filter = devfilter)
+	return render_template('outputList.html', area_filter = area, devices = controls, active_filter = devfilter)
 
-@app.route('/area/<int:area_id>/devices/', defaults = {'filterdesc': ''})
-@app.route('/area/<int:area_id>/devices/<filterdesc>')
-def enumerate_devices_by_area(area_id, filterdesc):
-	area = house.get_area_by_id(area_id)
-	devfilter = house.parse_devfilter_description(descriptor = filterdesc)
-	devices = area.get_devices_filtered_by(devfilter)
-	return render_template('outputList.html', area_filter = area, devices = devices, devclass = 'device', active_filter = devfilter)
 
 @app.context_processor
 def inject_house():
 	return dict(house = house)
+
 
 def start(theHouse, port = None, public = False, webdebug = False):
 	# save house object for handler classes to use

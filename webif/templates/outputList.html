@@ -2,6 +2,8 @@
 {% block title %}{{ devclass }}s{% endblock title %}
 {% block content %}
 
+{% set devclass = active_filter.devclass if active_filter and active_filter.devclass else 'device' %}
+
 <p>
 	{{ count_list_items(devices, devclass) }}
 	{% if area_filter %}
