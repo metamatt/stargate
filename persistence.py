@@ -30,7 +30,9 @@
 import datetime
 import dateutil.parser
 import logging
+import signal
 import sqlite3
+import sys
 import threading
 import time
 
@@ -39,15 +41,19 @@ logger = logging.getLogger(__name__)
 
 
 class SgPersistence(object):
-	def __init__(self, dbfilename):
-		self._dbfilename = dbfilename
-		self._conn = sqlite3.connect(dbfilename, check_same_thread = False)
+	def __init__(self, dbconfig):
+		
+		self._install_signal_handlers()
+		self._dbfilename = dbconfig['datafile']
+		self._checkpoint_interval = float(dbconfig['checkpoint_interval'])
+		self._conn = sqlite3.connect(self._dbfilename, check_same_thread = False)
 		self._conn.row_factory = sqlite3.Row
 		self._cursor = self._conn.cursor()
 		self._version = 1
 		self._init_schema()
 		self._clear_transient_values()
 		self._lock = threading.RLock()
+		self._install_periodic_checkpointer()
 
 	# public interface
 	# XXX: should public methods work directly on sg_devid instead of (gateway_id, gateway_devid) pairs?
@@ -155,6 +161,9 @@ class SgPersistence(object):
 			return row['bucket_name']
 
 	# private helpers
+	def _checkpoint(self):
+		logger.warn('database checkpoint requested (TODO)')
+
 	def _commit(self):
 		self._conn.commit()
 
@@ -251,6 +260,28 @@ class SgPersistence(object):
 		if from_version > self._version:
 			raise Exception('database version is from the future! (newer than runtime version)')
 		raise Exception('db upgrade not implemented')
+
+	def _install_signal_handlers(self):
+		def handle_signal(signum, stack_frame):
+			logger.warn("Received signal %d" % signum)
+			self._checkpoint()
+			if signum != signal.SIGHUP:
+				logger.warn("Exiting on signal %d" % signum)
+				sys.exit()
+
+		signal.signal(signal.SIGINT, handle_signal)
+		signal.signal(signal.SIGHUP, handle_signal)
+		signal.signal(signal.SIGTERM, handle_signal)
+	
+	def _install_periodic_checkpointer(self):
+		def checkpoint_callback(self):
+			# invoke the checkpoint
+			self._checkpoint()
+			# and reinstall this one-shot timer
+			self._install_periodic_checkpointer()
+		self._checkpoint_thread = threading.Timer(self._checkpoint_interval, checkpoint_callback, args = [self])
+		self._checkpoint_thread.setDaemon(True)
+		self._checkpoint_thread.start()
 
 
 # simple unit test

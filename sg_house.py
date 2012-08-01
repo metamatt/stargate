@@ -166,7 +166,7 @@ class StargateHouse(StargateArea):
 		# ordering is very important here!
 		# need to be mostly complete before calling StargateArea initializer
 		self.house = self
-		self.persist = persistence.SgPersistence('stargate.sqlite')
+		self.persist = persistence.SgPersistence(config['database'])
 		self.areas_by_name = {}
 		self.devices_by_id = {}
 		self.areas_by_id = {}

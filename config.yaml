@@ -2,6 +2,10 @@
 working_dir: ./RUN
 house_name: House da Joint
 
+database:
+    datafile: stargate.sqlite
+    checkpoint_interval: 5 # in seconds
+
 logging:
     logfile: stargate.log # stargate-%(pid)d.log
     # global output level
