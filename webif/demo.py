@@ -178,6 +178,14 @@ def enumerate_controls_by_area(area_id, filterdesc):
 	controls = area.get_devices_filtered_by(devfilter)
 	return render_template('outputList.html', area_filter = area, devices = controls, active_filter = devfilter)
 
+@app.route('/debug_break')
+def debug_break():
+	if app.debug:
+		# Cause an exception so the debugger will step in
+		raise Exception('debug break requested')
+	else:
+		# Hide from prying eyes by chaining to our 404 handler.
+		return not_found(None)
 
 @app.errorhandler(404)
 def not_found(error):
@@ -185,7 +193,7 @@ def not_found(error):
 
 @app.context_processor
 def inject_house():
-	return dict(house = house)
+	return dict(house = house, debug = app.debug)
 
 
 def start(theHouse, port = None, public = False, webdebug = False):

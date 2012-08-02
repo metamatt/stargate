@@ -28,6 +28,9 @@
         {% block footer %}
 			<hr>
 			<a href="{{ url_for('root') }}">back to top</a>
+			{% if debug %}
+				| <a href="{{ url_for('debug_break') }}">enter debugger</a>
+			{% endif %}
 	        <!--| Stargate &copy; Copyright 2012 by <a href="http://metamatt.com/">Matt Ginzton</a>. -->
         {% endblock footer %}
     </div>
