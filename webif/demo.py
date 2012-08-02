@@ -152,7 +152,7 @@ def enumerate_areas(filterdesc):
 
 @app.route('/area/<int:area_id>')
 def get_area(area_id):
-	return redirect(url_for('enumerate_devices_by_area'), area_id = area_id)
+	return redirect(url_for('enumerate_devices_by_area', area_id = area_id))
 
 @app.route('/area/<int:area_id>/devices/', defaults = {'filterdesc': ''})
 @app.route('/area/<int:area_id>/devices/<filterdesc>')
