@@ -39,6 +39,8 @@ import time
 
 logger = logging.getLogger(__name__)
 
+AREA_MAGIC_GATEWAY_ID = '__area__'
+
 
 class SgPersistence(object):
 	def __init__(self, dbconfig):
@@ -74,7 +76,7 @@ class SgPersistence(object):
 	def get_area_id(self, area_id):
 		# XXX: we reuse and abuse the device_map table for areas as well; that's the easiest way to
 		# get non-overlapping ids (which isn't strictly necessary but seems like good practice)
-		return self.get_device_id('__area__', area_id)
+		return self.get_device_id(AREA_MAGIC_GATEWAY_ID, area_id)
 
 	def init_device_state(self, gateway_id, gateway_device_id, state):
 		# This is a way of updating the tables used by on_device_state_change for events missed when we weren't running
@@ -87,6 +89,7 @@ class SgPersistence(object):
 			self._commit()
 
 	def on_device_state_change(self, gateway_id, gateway_device_id, state):
+		assert gateway_id != AREA_MAGIC_GATEWAY_ID
 		# XXX TODO: handle partial-on states (on_details)
 		with self._lock:
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
@@ -151,7 +154,7 @@ class SgPersistence(object):
 		logger.warn('database checkpoint requested')
 		with self._lock:
 			c = self._cursor
-			c.execute('SELECT sg_device_id FROM device_map')
+			c.execute('SELECT sg_device_id FROM device_map WHERE gateway_id <> ?', (AREA_MAGIC_GATEWAY_ID,))
 			for row in c.fetchall():
 				dev_id = row[0]
 				self._checkpoint_device_state(dev_id)
