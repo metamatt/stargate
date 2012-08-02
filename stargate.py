@@ -23,6 +23,22 @@ def str_to_loglevel(loglevel_str):
 	return loglevel
 
 
+# Simple class to allow attribute-style lookup of dictionary members.
+class AttrDict(dict):
+	# This handles only get, not set or del. I make no representation that
+	# it works for all possible cases; just that it works well enough for
+	# the use here (wrapping read-only config dictionary we read from yaml).
+	
+	# Note that we automatically convert embedded dictionaries to AttrDicts.
+	# Notably, we do not look inside lists, so a list of dictionaries will
+	# come back as normal dicts and not AttrDicts.
+	def __getitem__(self, name):
+		item = super(AttrDict, self).__getitem__(name)
+		return AttrDict(item) if type(item) == dict else item
+
+	__getattr__ = __getitem__
+
+
 if __name__ == '__main__':
 	# parse command line
 	p = optparse.OptionParser()
@@ -31,7 +47,7 @@ if __name__ == '__main__':
 	
 	# read yaml config file
 	config_file = open(options.config)
-	config = yaml.safe_load(config_file)
+	config = AttrDict(yaml.safe_load(config_file))
 	config_file.close()
 	
 	# go to working directory
@@ -40,11 +56,11 @@ if __name__ == '__main__':
 	
 	# configure logging
 	logger = logging.getLogger()
-	global_loglevel = str_to_loglevel(config['logging']['level'])
+	global_loglevel = str_to_loglevel(config.logging.level)
 	logger.setLevel(global_loglevel)
 	log_formatter = logging.Formatter('%(asctime)s %(threadName)-12s %(levelname)-8s: %(message)s')
 	# log to file
-	logfile_formatstr = config['logging']['logfile']
+	logfile_formatstr = config.logging.logfile
 	logfile_params = { 'pid': os.getpid() }
 	logfile = logfile_formatstr % logfile_params
 	file_loghandler = logging.FileHandler(logfile)
@@ -52,8 +68,8 @@ if __name__ == '__main__':
 	file_loghandler.setFormatter(log_formatter)
 	logger.addHandler(file_loghandler)
 	# log to console (with possibly reduced level)
-	if config['logging'].has_key('console_level'):
-		console_loglevel = str_to_loglevel(config['logging']['console_level'])
+	if config.logging.has_key('console_level'):
+		console_loglevel = str_to_loglevel(config.logging.console_level)
 		assert console_loglevel >= global_loglevel
 	else:
 		console_loglevel = global_loglevel
@@ -62,11 +78,11 @@ if __name__ == '__main__':
 	console_loghandler.setFormatter(log_formatter)
 	logger.addHandler(console_loghandler)
 	# configure module loglevels
-	for key in config['logging']:
+	for key in config.logging:
 		if key[:6] == 'level.':
 			module = key[6:]
 			module_logger = logging.getLogger(module)
-			module_loglevel = str_to_loglevel(config['logging'][key])
+			module_loglevel = str_to_loglevel(config.logging[key])
 			module_logger.setLevel(module_loglevel)
 	
 	# connect and log in
@@ -75,7 +91,7 @@ if __name__ == '__main__':
 	# the upshot is all this code runs twice and we only want it to run once.
 	# Figure out if we're the parent process which will exist only to watch over
 	# reloadable children, and if so, avoid any heavy lifting.
-	if config['server']['webdebug'] and not os.environ.get('WERKZEUG_RUN_MAIN'):
+	if config.server.webdebug and not os.environ.get('WERKZEUG_RUN_MAIN'):
 		logger.warning('startup: pid %d is the werkzeug reloader' % os.getpid())
 		house = None
 		os.chdir(orig_cwd)
@@ -84,4 +100,4 @@ if __name__ == '__main__':
 		house = StargateHouse(config)
 
 	# run the web app
-	webapp.start(house, **config['server'])
+	webapp.start(house, **config.server)

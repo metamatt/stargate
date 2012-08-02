@@ -167,15 +167,15 @@ class StargateHouse(StargateArea):
 		# ordering is very important here!
 		# need to be mostly complete before calling StargateArea initializer
 		self.house = self
-		self.persist = persistence.SgPersistence(config['database'])
+		self.persist = persistence.SgPersistence(config.database)
 		self.areas_by_name = {}
 		self.devices_by_id = {}
 		self.areas_by_id = {}
-		super(StargateHouse, self).__init__(self, config['house']['name'])
+		super(StargateHouse, self).__init__(self, config.house.name)
 		# finish initalization of all my fields before calling gateway loader
 		# ...
 		# gateway loader will cause a lot of stuff to happen
-		self.gateways = gateways.load_all(self, config['gateways'])
+		self.gateways = gateways.load_all(self, config.gateways)
 	
 	def get_device_by_gateway_and_id(self, gateway_id, gateway_device_id):
 		gateway = self.gateways[gateway_id]
