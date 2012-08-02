@@ -108,7 +108,7 @@ def enumerate_outputs(filterdesc):
 @app.route('/output/<int:dev_id>')
 def get_output(dev_id):
 	output = house.get_device_by_id(dev_id)
-	assert control.devclass == 'output'
+	assert output.devclass == 'output'
 	return render_template('output.html', device = output)
 
 @app.route('/output/<int:dev_id>', methods = ['POST'])
