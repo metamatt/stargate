@@ -12,6 +12,7 @@ import persistence
 
 
 logger = logging.getLogger(__name__)
+logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 # A note on object instantiation:
 # - toplevel framework instantiates a single StargateHouse instance
@@ -170,7 +171,7 @@ class StargateHouse(StargateArea):
 		self.areas_by_name = {}
 		self.devices_by_id = {}
 		self.areas_by_id = {}
-		super(StargateHouse, self).__init__(self, config['house_name'])
+		super(StargateHouse, self).__init__(self, config['house']['name'])
 		# finish initalization of all my fields before calling gateway loader
 		# ...
 		# gateway loader will cause a lot of stuff to happen

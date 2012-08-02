@@ -1,25 +1,44 @@
+# Configuration file for Stargate (https://github.com/metamatt/stargate).
+# Data is in YAML format (http://www.yaml.org/; http://en.wikipedia.org/wiki/YAML).
+#
+# Stargate takes an explicit-configuration approach: values listed here as "default"
+# are default only because this file specifies them by default, and must remain
+# in this file; the code won't know what to do without them.
+
 # global configuration
 working_dir: ./RUN
-house_name: House da Joint
 
+# persistent database (for device-state tracking and history)
 database:
+    # datafile: relative to working_dir; default is stargate.sqlite
     datafile: stargate.sqlite
-    checkpoint_interval: 5 # in seconds
+    # checkpoint_interval: how often to track time consumed by devices that
+    # have not changed state, in seconds; default 3600 (1 hour)
+    checkpoint_interval: 5
 
+# logfile, for debugging
 logging:
-    logfile: stargate.log # stargate-%(pid)d.log
-    # global output level
+    # logfile: relative to working_dir; default is stargate-%(pid)d.log
+    logfile: stargate.log
+    # level: global output level; one of (debug, info, warning, error)
     level: debug
-    # equal or higher level which is output to console
+    # equal or higher level which is output to console as well as logfile
     console_level: warning
     # loglevels for plugin modules
-    level.ra_repeater: debug
-    level.ra_repeater.listener: info
+    level.gateways.radiora2.ra_repeater: debug
+    level.gateways.radiora2.ra_repeater.listener: info
 
+# webserver configuration (for UI and API)
 server:
     port: 5000
     public: false
     webdebug: true
+
+# define the house and its areas
+house:
+    name: House da Joint
+    areas:
+        TODO
 
 # gateway plugin module configuration
 gateways:

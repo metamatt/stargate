@@ -13,7 +13,7 @@ import ra_repeater
 
 
 logger = logging.getLogger(__name__)
-
+logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 class LutronDevice(sg_house.StargateDevice):
 	# Individual RadioRa device -- includes both controllable outputs (what Lutron calls an "output")

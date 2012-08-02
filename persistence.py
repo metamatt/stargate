@@ -38,6 +38,7 @@ import time
 
 
 logger = logging.getLogger(__name__)
+logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 AREA_MAGIC_GATEWAY_ID = '__area__'
 

@@ -17,6 +17,7 @@ import threading
 
 
 logger = logging.getLogger(__name__)
+logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 # states we recognize in repeater listener
 STATE_FRESH_CONNECTION, STATE_PROCESSING, STATE_WANT_LOGIN, STATE_WANT_PASSWORD, STATE_READY = range(5)
@@ -267,7 +268,10 @@ class RaRepeater(object):
 				logger.warning('unmatched repeater reply: %s' % repr(line))
 
 	def start_listen_thread(self):
+		# Set up our own logger (note that it is used by scope, not by thread! The code lexically inside
+		# this function will use it; if we call other functions, they will not... ok?)
 		logger = logging.getLogger(__name__ + '.listener')
+		logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 		class RepeaterListener(threading.Thread):
 			repeater = None
 			daemon = True
