@@ -85,8 +85,13 @@ class SgPersistence(object):
 			c = self._cursor
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			current_ts = datetime.datetime.now()
-			c.execute('INSERT OR REPLACE INTO device_status(sg_device_id, last_tallied_ts, last_state) VALUES(?,?,?)',
-			           (dev_id, current_ts.isoformat(), state))
+			# want "upsert" -- "update" does nothing if the row didn't already exist; "insert or replace" creates a brand
+			# new row and, with only a subset of fields specified, will reset the unspecified fields to their default.
+			# This technique of using "insert or replace" for all fields, some of which reuse existing values when possible,
+			# comes from http://stackoverflow.com/questions/418898/sqlite-upsert-not-insert-or-replace.
+			c.execute('INSERT OR REPLACE INTO device_status(sg_device_id, last_seen_event_ts, last_tallied_ts, last_state) ' +
+			          'VALUES(?,(SELECT last_seen_event_ts from device_status where sg_device_id = ?),?,?)',
+			          (dev_id, dev_id, current_ts.isoformat(), state))
 			self._commit()
 
 	def on_device_state_change(self, gateway_id, gateway_device_id, state):
