@@ -55,13 +55,6 @@ class OutputDevice(LutronDevice):
 	def set_level(self, level):
 		self.gateway._set_output_level(self.iid, level)
 
-	def go_to_state(self, state):
-		handler = 'be_' + state
-		if not hasattr(self, handler):
-			return False
-		getattr(self, handler)()
-		return True
-
 	def get_name_for_level(self, level):
 		return 'on' if level > 0 else 'off'
 
@@ -350,15 +343,6 @@ class RaGateway(sg_house.StargateGateway):
 		else:
 			self.house.persist.on_device_state_change(self.gateway_id, iid, state)
 		
-	def _get_delta_since_change(self, iid):
-		return self.house.persist.get_delta_since_change(self.gateway_id, iid)
-
-	def _get_action_count(self, iid, bucket):
-		return self.house.persist.get_action_count(self.gateway_id, iid, bucket)
-
-	def _get_time_in_state(self, iid, state, bucket):
-		return self.house.persist.get_time_in_state(self.gateway_id, iid, state, bucket)
-
 	# private interface for owned objects to talk to repeater
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)

@@ -108,6 +108,13 @@ class StargateDevice(object):
 			return True
 		return False
 
+	def go_to_state(self, state):
+		handler = 'be_' + state
+		if not hasattr(self, handler):
+			return False
+		getattr(self, handler)()
+		return True
+
 	def get_current_states(self):
 		return [state for state in self.get_possible_states() if self.is_in_state(state)]
 
@@ -131,7 +138,7 @@ class StargateDevice(object):
 	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
 	# it's allowed to pass a level as the levelstate.
 	def get_time_in_state(self, levelstate, bucket = 1):
-		return self.house.persist.get_time_in_state(self.gateway.gateway_id, self.gateway_devid)
+		return self.house.persist.get_time_in_state(self.gateway.gateway_id, self.gateway_devid, levelstate, bucket)
 
 
 class StargateArea(object):
