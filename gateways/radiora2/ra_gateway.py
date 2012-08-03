@@ -27,6 +27,7 @@ class LutronDevice(sg_house.StargateDevice):
 	iid = None
 	devclass = None
 	devtype = None
+	level_max = 100
 	
 	def __init__(self, devclass, ra_area, iid, name):
 		super(LutronDevice, self).__init__(ra_area.house, ra_area.sg_area, ra_area.gateway, str(iid), name)

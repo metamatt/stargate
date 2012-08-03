@@ -19,8 +19,8 @@
 		| {{ emit_set_to_state_link(state) }}
 	{% endfor %}
 	
-	{% if device.set_level and device.level_step %}
-		| <input type="range" name="level" min="0" max="100" step = "{{ device.level_step }}" value="{{ device.get_level() }}">
+	{% if device.set_level and device.level_step and device.level_max %}
+		| <input type="range" name="level" min="0" max="{{ device.level_max }}" step = "{{ device.level_step }}" value="{{ device.get_level() }}">
 		{{ emit_set_to_level_link('Set') }}
 	{% endif %}
 </form>
