@@ -1,4 +1,4 @@
-{% set outputForm = 'output%d' % device.iid %}
+{% set outputForm = 'output%d' % device.device_id %}
 <form name="{{ outputForm }}" action="{{ url_for('set_output', dev_id = device.device_id) }}" method="post">
 	{% macro emit_set_to_level_link(name) -%}
 		<a href="#" onclick="document.{{ outputForm }}.elements['state'].value='level'; document.{{ outputForm }}.submit(); return false">{{ name }}</a>
