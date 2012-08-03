@@ -52,4 +52,11 @@ gateways:
             layout:
                 ignore_keypads: [1]
 
+    vera:
+        gateway:
+            hostname: vera-garage
+        devices:
+            17: Garage side deadbolt
+            18: Outside alley deadbolt
+
     # TODO: more modules
