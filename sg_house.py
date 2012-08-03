@@ -57,7 +57,17 @@ class StargateDevice(object):
 	#
 	# Then a lot of the general type/state stuff from LutronDevice/OutputDevice can move
 	# here, with a rethinking/cleanup of types and states themselves.
+	#
+	# XXX the above is becoming less true as I hoist more stuff here from LutronDevice.
+	# Rethink, rewrite, recomment.
 	
+	# XXX default order_states() implementation -- should not be called -- and we need
+	# a way for gateways to register this, and for the framework to aggregate them,
+	# instead of hardcoding. (Right now demo.py "aggregates" by hardcoding radiora2.)
+	@staticmethod
+	def order_states(states):
+		return states
+
 	# predefined fields that all devices must have, all subclasses must fill in
 	house = None            # StargateHouse instance
 	area = None             # StargateArea instance, where this device lives
