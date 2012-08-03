@@ -33,61 +33,7 @@ class LutronDevice(sg_house.StargateDevice):
 		self.devclass = devclass
 		self.ra_area = ra_area
 		self.iid = iid
-		self._possible_states = None
-		self._possible_actions = None
 		self.gateway._register_device(self)
-		
-	def matches_filter(self, devfilter):
-		if devfilter.devclass is not None and devfilter.devclass != self.devclass:
-			return False
-		if devfilter.devtype is not None and devfilter.devtype != self.devtype:
-			return False
-		if devfilter.devstate is not None and not self.is_in_state(devfilter.devstate):
-			return False
-		return True
-
-	def is_in_state(self, state):
-		# special case "age=NNN"
-		if state[:4] == 'age=':
-			age_max = int(state[4:])
-			delta = self.get_delta_since_change()
-			if not delta:
-				return False
-			my_age = delta.days * 86400 + delta.seconds
-			return my_age < age_max
-		# look for handler named after state
-		handler = 'is_' + state
-		if hasattr(self, handler):
-			return getattr(self, handler)()
-		# default answer based on class/type
-		if state == 'all' or state == self.devclass or state == self.devtype:
-			return True
-		return False
-
-	def get_current_states(self):
-		return [state for state in self.get_possible_states() if self.is_in_state(state)]
-
-	def get_possible_states(self):
-		if not self._possible_states:
-			self._possible_states = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
-		return self._possible_states
-
-	def get_possible_actions(self):
-		if not self._possible_actions:
-			self._possible_actions = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
-		return self._possible_actions
-	
-	def get_delta_since_change(self):
-		return self.gateway._get_delta_since_change(self.iid)
-		
-	def get_action_count(self, bucket = 1):
-		return self.gateway._get_action_count(self.iid, bucket)
-		
-	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
-	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
-	# it's allowed to pass a level as the levelstate.
-	def get_time_in_state(self, levelstate, bucket = 1):
-		return self.gateway._get_time_in_state(self.iid, levelstate, bucket)
 
 
 class OutputDevice(LutronDevice):
