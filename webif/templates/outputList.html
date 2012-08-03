@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ devclass }}s{% endblock title %}
-{% block content %}
-
 {% set devclass = active_filter.devclass if active_filter and active_filter.devclass else 'device' %}
+{% block title %}{{ devclass|capitalize }}s{% endblock title %}
+{% block content %}
 
 <p>
 	{{ count_list_items(devices, devclass) }}
