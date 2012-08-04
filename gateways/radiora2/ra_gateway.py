@@ -30,8 +30,8 @@ class LutronDevice(sg_house.StargateDevice):
 	level_max = 100
 	
 	def __init__(self, devclass, ra_area, iid, name):
-		super(LutronDevice, self).__init__(ra_area.house, ra_area.sg_area, ra_area.gateway, str(iid), name)
 		self.devclass = devclass
+		super(LutronDevice, self).__init__(ra_area.house, ra_area.sg_area, ra_area.gateway, str(iid), name)
 		self.ra_area = ra_area
 		self.iid = iid
 		self.gateway._register_device(self)

@@ -29,20 +29,25 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 class VeraDevice(sg_house.StargateDevice):
 	def __init__(self, house, area, gateway, vera_id, name):
+		self.devclass = 'output'
 		super(VeraDevice, self).__init__(house, area, gateway, str(vera_id), name)
-		self.devclass = 'output' # XXX: for now
 		self.vera_id = vera_id
 		self.gateway._register_device(self)
 
+	def is_pending(self):
+		# Determine whether Vera has any active jobs for this device.
+		# XXX may want to have some concept of the jobs we started, not just all jobs for the device.
+		return self.vera_id in self.gateway._vera_devices_with_jobs_in_progress()
+	
 
 class VeraDoorLock(VeraDevice):
-	KNOWN_STATES_IN_ORDER = [ 'unlocked', 'locked' ]
+	KNOWN_STATES_IN_ORDER = [ 'pending', 'unlocked', 'locked' ]
 	service_id = 'urn:micasaverde-com:serviceId:DoorLock1'
 	lock_state_var = 'Status'
 
 	def __init__(self, house, area, gateway, vera_id, name):
 		super(VeraDoorLock, self).__init__(house, area, gateway, vera_id, name)
-		self.devtype = 'deadbolt'
+		self.devtype = 'doorlock'
 		self.level_step = self.level_max = 1
 
 	def is_locked(self):
@@ -50,7 +55,7 @@ class VeraDoorLock(VeraDevice):
 		
 	def is_unlocked(self):
 		return not self.is_locked()
-	
+		
 	def be_locked(self):
 		self.set_level(1)
 	
@@ -112,9 +117,6 @@ class VeraGateway(sg_house.StargateGateway):
 		# get_variable and action need 'serviceId=urn:micasaverde-com:serviceId:DoorLock1&Variable=Status', which is better visible in user_data.
 		# but user_data is a PITA, I really don't want to parse all that, so I might as well just hardcode the serviceId and variable info for the device types I care about.
 		# Which is only doorlock, since alarm stuff (sensor/panel/partition) is better handled direct (I need 912 codes); I have no plans for camera; I have no other devices to test.
-		#
-		# XXX vera devices (at least door locks) take a long time (several seconds) to change state, but have good support for reporting outstanding tasks and progress;
-		# I should expose this (like state could be 'locked but changing' or just 'change pending').
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
@@ -142,13 +144,21 @@ class VeraGateway(sg_house.StargateGateway):
 		args = '%s&%s' % (device_variable_triad, action_details);
 		return self._vera_luup_request('action', args)
 	
+	def _vera_devices_with_jobs_in_progress(self):
+		status = self._vera_luup_request('status')
+		return [dev.id for dev in status.devices if len(dev.Jobs)]
+		
 	@staticmethod
 	def _device_variable_triad(device_num, service_id, variable_name):
 		return 'DeviceNum=%d&serviceId=%s&Variable=%s' % (device_num, service_id, variable_name)
 	
-	def _vera_luup_request(self, luup_cmd, arg_string):
-		url = 'http://%s:%d/data_request?id=%s&output_format=json&%s' % (self.hostname, self.port, luup_cmd, arg_string)
+	def _vera_luup_request(self, luup_cmd, *args):
+		url = 'http://%s:%d/data_request?id=%s&output_format=json' % (self.hostname, self.port, luup_cmd)
+		if len(args):
+			arg_string = '&'.join(args)
+			url += '&' + arg_string
 		logger.debug('vera command: %s' % url)
 		stream = urllib.urlopen(url)
 		response = json.load(stream)
 		return AttrDict(response) if type(response) == dict else response
+	

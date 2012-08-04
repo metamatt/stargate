@@ -27,7 +27,7 @@
 <p><font size=-1>
 	Usage information for <i>{{ device.area.name }}:{{ device.name }}</i>:
 	<ul><table>
-		<tr><td>Current state</td><td>{{ device.get_name_for_level(device.get_level()) }}</td></tr>
+		<tr><td>Current state</td><td>{{ device.get_current_states()|join(', ') }}</td></tr>
 		<tr><td>Time since last change</td><td>{{ device.get_delta_since_change() | human_readable_timedelta('longer than data is available') }}</td></tr>
 		<tr><td>Number of changes today</td><td>{{ device.get_action_count() }}</td></tr>
 		<tr><td>Total time {{ device.get_name_for_level(1) }}</td><td>{{ device.get_time_in_state(True) | human_readable_timedelta }}</td></tr>

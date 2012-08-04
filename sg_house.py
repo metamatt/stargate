@@ -78,6 +78,8 @@ class StargateDevice(object):
 	_possible_actions = None# Memoization for get_possible_actions()
 
 	def __init__(self, house, area, gateway, gateway_devid, name):
+		# for now, we require devclass to have been set by subclass; not really good design
+		assert self.devclass in StargateDeviceFilter.DEVICE_CLASSES
 		assert isinstance(house, StargateHouse)
 		assert isinstance(area, StargateArea)
 		assert isinstance(gateway, StargateGateway)
