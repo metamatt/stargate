@@ -14,6 +14,9 @@ def load_all(sg_house, gateways_config):
 		gateway_module = importlib.import_module('.' + gateway_module_name, __name__)
 		# Locate gateway configuration
 		config = gateways_config[gateway_module_name]
+		if config.has_key('disabled') and config.disabled:
+			continue
+
 		# XXX: may want facility for running multiple instances of the same gateway plugin, with unique names/config?
 		gateway_instance_name = gateway_module_name # for now
 		# Construct gateway

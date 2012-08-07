@@ -12,7 +12,6 @@
 #
 # XXX to-do:
 # - device enumeration / room assignment
-# - in-progress state awareness
 # - polling/notification for device history tracking
 # - other device types (?)
 

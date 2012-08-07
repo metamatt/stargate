@@ -246,6 +246,8 @@ class StargateHouse(StargateArea):
 		# ...
 		# gateway loader will cause a lot of stuff to happen
 		self.gateways = gateways.load_all(self, config.gateways)
+		if not len(self.gateways):
+			raise Exception("No gateways were loaded")
 	
 	def get_device_by_gateway_and_id(self, gateway_id, gateway_device_id):
 		gateway = self.gateways[gateway_id]
