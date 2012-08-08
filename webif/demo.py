@@ -1,3 +1,7 @@
+# (c) 2012 Matt Ginzton, matt@ginzton.net
+#
+# Simple web UI for Stargate.
+
 import datetime
 import time
 

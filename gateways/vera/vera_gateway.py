@@ -19,6 +19,7 @@ import logging
 import threading
 import urllib
 
+from sg_util import AttrDict
 import sg_house
 
 
@@ -90,26 +91,6 @@ class VeraRoom(object):
 		self.vera_room = vera_room
 		# match with house area
 		self.sg_area = gateway.house.get_area_by_name(vera_room.name)
-
-
-# Simple class to allow attribute-style lookup of dictionary members.
-class AttrDict(dict):
-	# This handles only get, not set or del. I make no representation that
-	# it works for all possible cases; just that it works well enough for
-	# the use here (wrapping read-only dictionary we read from json).
-	
-	# Note that we automatically convert embedded dictionaries to AttrDicts,
-	# and embedded lists of dictionaries to lists of AttrDicts, on extraction
-	# (as long as you use our method of extraction).
-	def __getitem__(self, name):
-		item = super(AttrDict, self).__getitem__(name)
-		if type(item) == dict:
-			return AttrDict(item)
-		elif type(item) == list:
-			return [AttrDict(i) for i in item]
-		else:
-			return item
-	__getattr__ = __getitem__
 
 
 class VeraGateway(sg_house.StargateGateway):

@@ -1,11 +1,8 @@
 #! /usr/bin/env python
 #
-# Simple test module for Lutron RadioRa2 network integration.
-# Author: matt@ginzton.net
+# (c) 2012 Matt Ginzton, matt@ginzton.net
 #
-# Bugs:
-# - simple, incomplete
-# - should reconnect automatically if connection drops
+# Stargate is a framework for controlling and integrating home automation gateways.
 
 import logging
 import optparse
@@ -14,6 +11,7 @@ import yaml
 
 import webif.demo as webapp
 from sg_house import StargateHouse
+from sg_util import AttrDict
 
 
 def str_to_loglevel(loglevel_str):
@@ -21,22 +19,6 @@ def str_to_loglevel(loglevel_str):
 	if not isinstance(loglevel, int):
 		raise ValueError('Invalid log level: %s' % loglevel_str)
 	return loglevel
-
-
-# Simple class to allow attribute-style lookup of dictionary members.
-class AttrDict(dict):
-	# This handles only get, not set or del. I make no representation that
-	# it works for all possible cases; just that it works well enough for
-	# the use here (wrapping read-only config dictionary we read from yaml).
-	
-	# Note that we automatically convert embedded dictionaries to AttrDicts.
-	# Notably, we do not look inside lists, so a list of dictionaries will
-	# come back as normal dicts and not AttrDicts.
-	def __getitem__(self, name):
-		item = super(AttrDict, self).__getitem__(name)
-		return AttrDict(item) if type(item) == dict else item
-
-	__getattr__ = __getitem__
 
 
 if __name__ == '__main__':
