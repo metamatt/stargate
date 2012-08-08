@@ -34,7 +34,7 @@ if __name__ == '__main__':
 	
 	# go to working directory
 	orig_cwd = os.getcwd()
-	os.chdir(config['working_dir'])
+	os.chdir(config.working_dir)
 	
 	# configure logging
 	logger = logging.getLogger()

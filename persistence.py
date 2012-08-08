@@ -47,7 +47,7 @@ class SgPersistence(object):
 	def __init__(self, dbconfig):
 		
 		self._install_signal_handlers()
-		self._dbfilename = dbconfig['datafile']
+		self._dbfilename = dbconfig.datafile
 		self._conn = sqlite3.connect(self._dbfilename, check_same_thread = False)
 		self._conn.row_factory = sqlite3.Row
 		self._cursor = self._conn.cursor()
@@ -55,7 +55,7 @@ class SgPersistence(object):
 		self._init_schema()
 		self._clear_transient_values()
 		self._lock = threading.RLock()
-		self._checkpoint_interval = float(dbconfig['checkpoint_interval'])
+		self._checkpoint_interval = float(dbconfig.checkpoint_interval)
 		if self._checkpoint_interval > 0:
 			self._install_periodic_checkpointer()
 

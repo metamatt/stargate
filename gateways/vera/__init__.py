@@ -5,7 +5,7 @@
 import vera_gateway
 
 def init(house, instance_name, gateway_config):
-	hostname = gateway_config['gateway']['hostname']
-	poll_interval = gateway_config['gateway']['poll_interval']
+	hostname = gateway_config.gateway.hostname
+	poll_interval = gateway_config.gateway.poll_interval
 	
 	return vera_gateway.VeraGateway(house, instance_name, hostname, poll_interval)
