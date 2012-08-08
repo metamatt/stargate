@@ -44,7 +44,7 @@ house:
 # one section for each gateway plugin to load, by name
 gateways:
     radiora2:
-        # disabled: true # default false, uncomment to disable while testing
+        # disabled: true # optional, default false, uncomment to disable while testing
         repeater:
             hostname: lutron-radiora
             username: stargate
@@ -55,11 +55,8 @@ gateways:
                 ignore_keypads: [1]
 
     vera:
-        # disabled: true # default false, uncomment to disable while testing
+        # disabled: true # optional, default false, uncomment to disable while testing
         gateway:
             hostname: vera-garage
-        devices:
-            17: Garage side deadbolt
-            18: Outside alley deadbolt
 
     # TODO: more modules

@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 class VeraDevice(sg_house.StargateDevice):
-	def __init__(self, house, area, gateway, vera_id, name):
+	def __init__(self, vera_room, vera_id, name):
 		self.devclass = 'output'
-		super(VeraDevice, self).__init__(house, area, gateway, str(vera_id), name)
+		self.vera_room = vera_room
 		self.vera_id = vera_id
-		self.gateway._register_device(self)
+		super(VeraDevice, self).__init__(vera_room.gateway.house, vera_room.sg_area, vera_room.gateway, str(vera_id), name)
 
 	def is_pending(self):
 		# Determine whether Vera has any active jobs for this device.
@@ -44,8 +44,8 @@ class VeraDoorLock(VeraDevice):
 	service_id = 'urn:micasaverde-com:serviceId:DoorLock1'
 	lock_state_var = 'Status'
 
-	def __init__(self, house, area, gateway, vera_id, name):
-		super(VeraDoorLock, self).__init__(house, area, gateway, vera_id, name)
+	def __init__(self, vera_room, vera_id, name):
+		super(VeraDoorLock, self).__init__(vera_room, vera_id, name)
 		self.devtype = 'doorlock'
 		self.level_step = self.level_max = 1
 
@@ -72,6 +72,18 @@ class VeraDoorLock(VeraDevice):
 		return 'locked' if level else 'unlocked'
 
 
+class VeraRoom(object):
+	gateway = None
+	sg_area = None
+	vera_room = None
+	
+	def __init__(self, gateway, vera_room):
+		self.gateway = gateway
+		self.vera_room = vera_room
+		# match with house area
+		self.sg_area = gateway.house.get_area_by_name(vera_room.name)
+
+
 # Simple class to allow attribute-style lookup of dictionary members.
 class AttrDict(dict):
 	# This handles only get, not set or del. I make no representation that
@@ -93,40 +105,48 @@ class AttrDict(dict):
 
 
 class VeraGateway(sg_house.StargateGateway):
-	def __init__(self, house, gateway_instance_name, hostname, devices):
+	def __init__(self, house, gateway_instance_name, hostname):
 		super(VeraGateway, self).__init__(house, gateway_instance_name)
 		self.hostname = hostname
 		self.port = 49451
-		self.devices = {}
-
-		# fake global 'vera' area for now
-		self.area = house.get_area_by_name('Vera devices')
-
-		# build devices mentioned in config file
-		for dev_id in devices:
-			VeraDoorLock(house, self.area, self, dev_id, devices[dev_id])
+		self.devices = {} # map from int id to VeraDevice
+		self.rooms = {} # map from int id to VeraRoom
+		self.catmap = {} # map from int id to AttrDict representing sdata category response
 		
-		# OK, tools at my disposal:
-		# room enumeration: sdata or user_data
-		# device enumeration with name and type: sdata or user_data
-		# check status: get_variable or sdata or user_data
-		# set status: action
-		# notify of change: unknown, poll get_variable or sdata?
-		# sdata seems like the way to go, but it uses funny (simplified) device types: locks have 'locked' field and a 'category' field that maps through a separate table to 'Door lock'.
-		# get_variable and action need 'serviceId=urn:micasaverde-com:serviceId:DoorLock1&Variable=Status', which is better visible in user_data.
-		# but user_data is a PITA, I really don't want to parse all that, so I might as well just hardcode the serviceId and variable info for the device types I care about.
-		# Which is only doorlock, since alarm stuff (sensor/panel/partition) is better handled direct (I need 912 codes); I have no plans for camera; I have no other devices to test.
+		# parse sdata to enumerate rooms and devices
+		# XXX ignore "sections"
+		sdata = self._vera_luup_request('sdata')
+		for room in sdata.rooms:
+			self.rooms[room.id] = VeraRoom(self, room)
+		for category in sdata.categories:
+			self.catmap[category.id] = category
+		for device in sdata.devices:
+			self.devices[device.id] = self._create_device(device)
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
 		assert isinstance(gateway_devid, int)
 		vera_id = int(gateway_devid)
 		return self.devices[vera_id]
-
-	# private interface for owned objects to populate node tree
-	def _register_device(self, device):
-		self.devices[device.vera_id] = device
 		
+	# private helper for device creation
+	def _create_device(self, sdata_device):
+		# map for correct VeraDevice subclass matching Vera device type.
+		map_sdata_device_name_to_class = {
+			u'Door lock': VeraDoorLock,
+			# no more for now -- the only examples I have are camera/alarm/sensor and those
+			# are not interesting via Vera; if I want to talk to them I'll do it directly
+		}
+
+		try:
+			cls = map_sdata_device_name_to_class[self.catmap[sdata_device.category].name]
+		except KeyError:
+			category = self.catmap[sdata_device.category] if self.catmap.has_key(sdata_device.category) else ('#%d' % sdata_device.category)
+			logger.error('unknown vera device category %s for device %s' % (category, sdata_device.name))
+			return None
+		return cls(self.rooms[sdata_device.room], sdata_device.id, sdata_device.name)
+	
+
 	# private interface for owned objects to talk to vera gateway
 	def _luup_get_variable(self, service_id, device_num, variable_name):
 		device_variable_triad = self._device_variable_triad(device_num, service_id, variable_name)
