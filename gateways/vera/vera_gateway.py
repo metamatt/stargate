@@ -10,14 +10,13 @@
 # http://wiki.micasaverde.com/index.php/Luup_Sdata
 # http://wiki.micasaverde.com/index.php/Luup_Requests
 #
-# XXX to-do:
-# - device enumeration / room assignment
-# - polling/notification for device history tracking
-# - other device types (?)
+# To do:
+# - handle more device types (?)
 
 
 import json
 import logging
+import threading
 import urllib
 
 import sg_house
@@ -27,11 +26,11 @@ logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 class VeraDevice(sg_house.StargateDevice):
-	def __init__(self, vera_room, vera_id, name):
+	def __init__(self, gateway, dev_sdata):
 		self.devclass = 'output'
-		self.vera_room = vera_room
-		self.vera_id = vera_id
-		super(VeraDevice, self).__init__(vera_room.gateway.house, vera_room.sg_area, vera_room.gateway, str(vera_id), name)
+		self.vera_room = gateway.rooms[dev_sdata.room]
+		self.vera_id = dev_sdata.id
+		super(VeraDevice, self).__init__(gateway.house, self.vera_room.sg_area, gateway, str(self.vera_id), dev_sdata.name)
 
 	def is_pending(self):
 		# Determine whether Vera has any active jobs for this device.
@@ -44,10 +43,12 @@ class VeraDoorLock(VeraDevice):
 	service_id = 'urn:micasaverde-com:serviceId:DoorLock1'
 	lock_state_var = 'Status'
 
-	def __init__(self, vera_room, vera_id, name):
-		super(VeraDoorLock, self).__init__(vera_room, vera_id, name)
+	def __init__(self, gateway, dev_sdata):
+		super(VeraDoorLock, self).__init__(gateway, dev_sdata)
 		self.devtype = 'doorlock'
 		self.level_step = self.level_max = 1
+		self.last_locked_state = int(dev_sdata.locked)
+		self.house.persist.init_device_state(self.gateway.gateway_id, self.vera_id, self.last_locked_state)
 
 	def is_locked(self):
 		return self.get_level() == 1
@@ -70,6 +71,13 @@ class VeraDoorLock(VeraDevice):
 		
 	def get_name_for_level(self, level):
 		return 'locked' if level else 'unlocked'
+		
+	def vera_poll_update(self, dev_sdata):
+		locked = int(dev_sdata.locked)
+		logger.debug('device %s state last %d now %d' % (self.name, self.last_locked_state, locked))
+		if locked != self.last_locked_state:
+			self.house.persist.on_device_state_change(self.gateway.gateway_id, self.vera_id, locked)
+			self.last_locked_state = locked
 
 
 class VeraRoom(object):
@@ -105,10 +113,11 @@ class AttrDict(dict):
 
 
 class VeraGateway(sg_house.StargateGateway):
-	def __init__(self, house, gateway_instance_name, hostname):
+	def __init__(self, house, gateway_instance_name, hostname, poll_interval):
 		super(VeraGateway, self).__init__(house, gateway_instance_name)
 		self.hostname = hostname
-		self.port = 49451
+		self.port = 3480
+		self.poll_interval = poll_interval
 		self.devices = {} # map from int id to VeraDevice
 		self.rooms = {} # map from int id to VeraRoom
 		self.catmap = {} # map from int id to AttrDict representing sdata category response
@@ -122,6 +131,9 @@ class VeraGateway(sg_house.StargateGateway):
 			self.catmap[category.id] = category
 		for device in sdata.devices:
 			self.devices[device.id] = self._create_device(device)
+			
+		# create poll thread to periodically poll Vera for changes
+		self._install_periodic_poller()
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
@@ -130,7 +142,7 @@ class VeraGateway(sg_house.StargateGateway):
 		return self.devices[vera_id]
 		
 	# private helper for device creation
-	def _create_device(self, sdata_device):
+	def _create_device(self, dev_sdata):
 		# map for correct VeraDevice subclass matching Vera device type.
 		map_sdata_device_name_to_class = {
 			u'Door lock': VeraDoorLock,
@@ -139,13 +151,30 @@ class VeraGateway(sg_house.StargateGateway):
 		}
 
 		try:
-			cls = map_sdata_device_name_to_class[self.catmap[sdata_device.category].name]
+			cls = map_sdata_device_name_to_class[self.catmap[dev_sdata.category].name]
 		except KeyError:
-			category = self.catmap[sdata_device.category] if self.catmap.has_key(sdata_device.category) else ('#%d' % sdata_device.category)
-			logger.error('unknown vera device category %s for device %s' % (category, sdata_device.name))
+			category = self.catmap[dev_sdata.category] if self.catmap.has_key(dev_sdata.category) else ('#%d' % dev_sdata.category)
+			logger.info('Ignoring Vera device "%s" of unknown type "%s"' % (dev_sdata.name, category))
 			return None
-		return cls(self.rooms[sdata_device.room], sdata_device.id, sdata_device.name)
-	
+		return cls(self, dev_sdata)
+
+	# private helper for change-poll-notification
+	def _install_periodic_poller(self):
+		def poll_callback(self):
+			# read sdata and re-forward every device its current data record
+			try:
+				sdata = self._vera_luup_request('sdata')
+				for device in sdata.devices:
+					if self.devices.has_key(device.id) and self.devices[device.id]:
+						self.devices[device.id].vera_poll_update(device)
+			except Exception as ex:
+				logger.exception(ex)
+			# and reinstall this one-shot timer
+			self._install_periodic_poller()
+		self._poll_thread = threading.Timer(self.poll_interval, poll_callback, args = [self])
+		self._poll_thread.setDaemon(True)
+		self._poll_thread.setName('vera_poll_timer')
+		self._poll_thread.start()
 
 	# private interface for owned objects to talk to vera gateway
 	def _luup_get_variable(self, service_id, device_num, variable_name):

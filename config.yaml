@@ -58,5 +58,6 @@ gateways:
         # disabled: true # optional, default false, uncomment to disable while testing
         gateway:
             hostname: vera-garage
+            poll_interval: 5 # in seconds
 
     # TODO: more modules
