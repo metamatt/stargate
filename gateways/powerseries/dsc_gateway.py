@@ -28,8 +28,11 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class DscPanel(sg_house.StargateDevice):
+	KNOWN_STATES_IN_ORDER = [ 'placeholder' ]
+
 	def __init__(self, gateway):
-		self.devclass = 'control'
+		self.devclass = 'control' # XXX: is it? compound/parent might be better, with a bunch of outputs and controls underneath.
+		self.devtype = 'placeholder'
 		area = gateway.house # XXX for now
 		super(DscPanel, self).__init__(gateway.house, area, gateway, 'panel', 'DSC PowerSeries')
 
@@ -228,12 +231,21 @@ class DscGateway(sg_house.StargateGateway):
 		self._response_cmd_map = {
 			501: self._do_invalid_cmd,
 			505: self._do_login,
+			# zone status updates
+			# XXX: note 601-610 all report different things about a zone; should have broader concept of zone state
 			609: self._do_zone_open,
 			610: self._do_zone_closed,
+			# partition status updates
+			# XXX: note 650-659 all report different things about a partition; also maybe 66x and 67x. Should have broader concept of partition state
 			650: self._do_partition_ready,
 			673: self._do_partition_busy,
 			840: self._do_partition_trouble_on,
 			841: self._do_partition_trouble_off,
+			# arm/disarm (DSC terminology is partition open/closing)
+			# XXX TODO: 70x (closing), 75x (opening)
+			# command in progress
+			912: self._do_user_command_invoked,
+			# XXX: do I want to consider 660 as part of this or partition status? 912 is more useful as an event notification, assuming it's supported
 		}
 		# Right now, this only knows how to connect over a TCP socket
 		# and authenticate using Envisalink's protocol, so it basically
@@ -245,16 +257,21 @@ class DscGateway(sg_house.StargateGateway):
 		self.port = 4025
 		self.reflector_port = config.gateway.reflector_port if config.gateway.has_key('reflector_port') else 0
 		self.password = config.gateway.password
-
+		
+		# create devices
+		self.panel = DscPanel(self)
 		# parse layout from config file
+		# areas
 		areas_by_zone = {}
 		for area_name in config.area_mapping: # map name: list of zone ids
 			sg_area = house.get_area_by_name(area_name)
 			for zone_num in config.area_mapping[area_name]:
 				areas_by_zone[zone_num] = sg_area
+		# zones
 		self.zones_by_id = {}
 		for zone_num in config.zone_names:
 			self.zones_by_id[zone_num] = DscZoneSensor(self, areas_by_zone[zone_num], zone_num, config.zone_names[zone_num])
+		# partitions
 		self.partitions_by_id = {}
 		for partition_num in config.partition_names:
 			self.partitions_by_id[partition_num] = DscPartition(self, partition_num, config.partition_names[partition_num])
@@ -368,3 +385,9 @@ class DscGateway(sg_house.StargateGateway):
 	def _do_partition_trouble_off(self, data):
 		partition = int(data)
 		logger.info('partition %d: no trouble' % partition)
+
+	def _do_user_command_invoked(self, data):
+		assert len(data) == 2
+		partition_num = int(data[0])
+		command_num = int(data[1])
+		logger.info('user command %d on partition %d' % (command_num, partition_num))
