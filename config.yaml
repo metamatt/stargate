@@ -27,6 +27,8 @@ logging:
     # loglevels for plugin modules
     level.gateways.radiora2.ra_repeater: debug
     level.gateways.radiora2.ra_repeater.listener: info
+    level.gateways.powerseries.dsc_gateway: debug
+    level.gateways.powerseries.dsc_gateway.listener: info
 
 # webserver configuration (for UI and API)
 server:
@@ -35,6 +37,7 @@ server:
     webdebug: true
 
 # define the house and its areas
+# (gateway plugins can map to these or add their own)
 house:
     name: House da Joint
     areas:
@@ -60,4 +63,18 @@ gateways:
             hostname: vera-garage
             poll_interval: 5 # in seconds
 
-    # TODO: more modules
+    powerseries:
+        disabled: true # optional, default false, uncomment to disable while testing
+        gateway:
+            hostname: envisalink
+            password: user
+            reflector_port: 4025 # 0 to disable (default)
+        zone_names:
+            - 1: TODO
+        partition_names:
+            - 1: Burglar alarm
+            - 2: Lighting integration
+            - 3: Lock integration
+        area_mapping:
+            Area 1: [ 1, 2, 3]
+            Area 51: [ 4, 5, 6]
