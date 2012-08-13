@@ -70,11 +70,20 @@ gateways:
             password: user
             reflector_port: 4025 # 0 to disable (default)
         zone_names:
-            - 1: TODO
+            1: Garage door
+            2: Garage side door
+            5: Alley door
+            6: Storage room door
+            9: Media room back door
+            17: Front door
+            18: Kitchen back door
         partition_names:
-            - 1: Burglar alarm
-            - 2: Lighting integration
-            - 3: Lock integration
+            1: Burglar alarm
+            2: Lighting integration
+            3: Lock integration
         area_mapping:
-            Area 1: [ 1, 2, 3]
-            Area 51: [ 4, 5, 6]
+            Garage: [ 1, 2 ]
+            Outside: [ 5, 6 ]
+            Entryway: [ 17 ]
+            Kitchen: [ 18 ]
+            Media room: [ 9 ]

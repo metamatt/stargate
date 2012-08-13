@@ -5,7 +5,15 @@
 # This module provides high-level objects representing the various
 # sensors/devices controlled via a DSC PowerSeries alarm and IT-100
 # or Envisalink 2DS integration module.
-
+#
+# BUGS:
+# - reflector is largely untested
+# TODO:
+# - clean up/flesh out cache; settle on way of doing device ids across zone/partition/other
+# - figure out how to model keyfob events
+# - split into modules
+# - add 'sensor' devclass?
+# - persistence, change tracking
 
 import logging
 import select
@@ -19,21 +27,46 @@ logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 
-# XXX what to model?
-# panel as output: PGM outputs
-# panel as control: zone sensor state; alarm states and user commands; basically any verb user can send by *xy code or map to keypad or keyfob button
-# sensor as control: open/close state; change history
-# keypad as control: but what inputs matter, and do we care about location? User might think so, but I don't see much to treat differently about multiple keypads
-# Verdict:
-# - sensor state -> control: yes
-# - panel PGM -> output: maybe
-# - panel keypad/keyfob -> control: yes
-# - maybe we need a concept of parent/child devices after all? would like to see panel as control with links to individual sensor controls for state history
 class DscPanel(sg_house.StargateDevice):
 	def __init__(self, gateway):
 		self.devclass = 'control'
-		# super(VeraDevice, self).__init__(gateway.house, self.vera_room.sg_area, gateway, str(self.vera_id), dev_sdata.name)
+		area = gateway.house # XXX for now
+		super(DscPanel, self).__init__(gateway.house, area, gateway, 'panel', 'DSC PowerSeries')
 
+	# as control: read of events mapped to keyfob buttons, but what object do those land on?
+	
+class DscPartition(sg_house.StargateDevice):
+	KNOWN_STATES_IN_ORDER = [ 'ready', 'trouble', 'armed' ]
+
+	def __init__(self, gateway, partition_num, name):
+		self.devclass = 'control'
+		self.devtype = 'alarmpartition'
+		area = gateway.house # XXX for now
+		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition%d' % partition_num, name)
+
+	# as a control: this should be able to arm/disarm (read and write)
+	
+class DscZoneSensor(sg_house.StargateDevice):
+	KNOWN_STATES_IN_ORDER = [ 'closed', 'open' ]
+
+	def __init__(self, gateway, area, zone_number, name):
+		self.devclass = 'control'
+		self.devtype = 'sensor' # XXX should this be a devclass?
+		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone%d' % zone_number, name)
+		self.open_state = None
+		self.zone_number = zone_number
+
+	def get_level(self):
+		return self.gateway._get_zone_status(self.zone_number)
+		
+	def get_name_for_level(self, level):
+		return 'open' if level else 'closed'
+
+	def is_open(self):
+		return self.get_level() == 1
+		
+	def is_closed(self):
+		return not self.is_open()
 
 
 class CrlfSocketBuffer(object):
@@ -147,10 +180,49 @@ class Reflector(object):
 		# Child gave command; pass along to DSC
 		assert cmdline[:3] != '005' # make sure children don't mess with parent authentication state
 		self.gateway._send_dsc_cmdline(cmdline)
-	
+
+
+class DscPanelCache(object):
+	zone_status = {}
+	partition_status = {}
+	subscribers = []
+
+	def __init__(self, gateway):
+		self.gateway = gateway
+		for i in range(1, 65):
+			self.zone_status[i] = 'stale'
+		for i in range(1, 9):
+			self.partition_status[i] = 'stale'
+		self.gateway.send_dsc_command(001) # request global status
+
+	def get_zone_status(self, zone_num):
+		status = self.zone_status[zone_num]
+		while status == 'stale':
+			time.sleep(0.1)
+			status = self.zone_status[zone_num]
+		return status
+
+	# DscGateway private interface
+	def _record_zone_status(self, zone_num, status):
+		# should be called only by DscGateway._receive_dsc_cmd()
+		logger.info('_record_zone_state: zone %d status %d' % (zone_num, status))
+		self.zone_status[zone_num] = status
+		self._broadcast_change(zone_num, status)
+
+	def _record_partition_status(self, partition_num, status):
+		# should be called only by DscGateway._receive_dsc_cmd()
+		logger.info('_record_partition_state: partition %d status %d' % (partition_num, status))
+		self.partition_status[partition_num] = status
+		self._broadcast_change(partition_num, status)
+
+	def _broadcast_change(self, dev_id, state):
+		refresh = False # XXX
+		logger.debug('broadcast_change: sending on_user_action(dev_id=%s, refresh=%s)' % (dev_id, str(refresh)))
+		for subscriber in self.subscribers:
+			subscriber.on_user_action(dev_id, state, refresh)
+
 
 class DscGateway(sg_house.StargateGateway):
-
 	def __init__(self, house, gateway_instance_name, config):
 		super(DscGateway, self).__init__(house, gateway_instance_name)
 		self._response_cmd_map = {
@@ -173,18 +245,32 @@ class DscGateway(sg_house.StargateGateway):
 		self.port = 4025
 		self.reflector_port = config.gateway.reflector_port if config.gateway.has_key('reflector_port') else 0
 		self.password = config.gateway.password
-		
-		self.sender_lock = threading.RLock()
+
+		# parse layout from config file
+		areas_by_zone = {}
+		for area_name in config.area_mapping: # map name: list of zone ids
+			sg_area = house.get_area_by_name(area_name)
+			for zone_num in config.area_mapping[area_name]:
+				areas_by_zone[zone_num] = sg_area
+		self.zones_by_id = {}
+		for zone_num in config.zone_names:
+			self.zones_by_id[zone_num] = DscZoneSensor(self, areas_by_zone[zone_num], zone_num, config.zone_names[zone_num])
+		self.partitions_by_id = {}
+		for partition_num in config.partition_names:
+			self.partitions_by_id[partition_num] = DscPartition(self, partition_num, config.partition_names[partition_num])
+
+		# set up network connections
 		self._connect()
-		
 		self.listen_thread = ListenerThread(self)
 		self.listen_thread.start()
 		self.reflector = Reflector(self, self.reflector_port, self.password)
 
+		# and start everything in motion
 		self._login(self.password)
-		self.send_dsc_command(001) # request global status
+		self.cache = DscPanelCache(self)
 		
 	def _connect(self):
+		self.sender_lock = threading.RLock()
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.connect((self.hostname, self.port))
 		self.socket.setblocking(0)
@@ -196,7 +282,12 @@ class DscGateway(sg_house.StargateGateway):
 		# Can be called on any stargate thread; will send data over network socket to DSC system
 		cmdline = self._encode_dsc_command(command, data_bytes)
 		self._send_dsc_cmdline(cmdline)
-		
+	
+	# child-device interface for device status
+	def _get_zone_status(self, zone_num):
+		return self.cache.get_zone_status(zone_num)
+
+	# private helpers for command send/receive
 	def _send_dsc_cmdline(self, cmdline):
 		# Cmdline: encoded command with checksum but no CRLF terminator
 		# Send over network to panel.
@@ -241,27 +332,34 @@ class DscGateway(sg_house.StargateGateway):
 		cmd.extend([hex(nibble)[-1].upper() for nibble in [ checksum / 16, checksum % 16]])
 		return ''.join(cmd)
 	
+	# private handlers for _receive_dsc_cmd
 	def _do_invalid_cmd(self, data):
 		logger.warning('panel complains of invalid command')
 
 	def _do_login(self, data):
 		logger.info('login response: %d' % int(data))
+		assert int(data) > 0 # XXX temporary
+		# XXX should have a concept of gateway online/offline/error
 		
 	def _do_zone_open(self, data):
 		zone = int(data)
 		logger.info('zone %d: open' % zone)
+		self.cache._record_zone_status(zone, 1)
 
 	def _do_zone_closed(self, data):
 		zone = int(data)
 		logger.info('zone %d: closed' % zone)
+		self.cache._record_zone_status(zone, 0)
 
 	def _do_partition_ready(self, data):
 		partition = int(data)
 		logger.info('partition %d: ready' % partition)
+		self.cache._record_partition_status(partition, 1)
 
 	def _do_partition_busy(self, data):
 		partition = int(data)
 		logger.info('partition %d: busy' % partition)
+		self.cache._record_partition_status(partition, 0)
 
 	def _do_partition_trouble_on(self, data):
 		partition = int(data)
