@@ -3,6 +3,10 @@
 # stargate.gateways package init
 
 import importlib
+import logging
+
+logger = logging.getLogger(__name__)
+logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 
 def load_all(sg_house, gateways_config):
@@ -15,7 +19,9 @@ def load_all(sg_house, gateways_config):
 		# Locate gateway configuration
 		config = gateways_config[gateway_module_name]
 		if config.has_key('disabled') and config.disabled:
+			logger.info('ignoring disabled gateway "%s"' % gateway_module_name)
 			continue
+		logger.info('loading gateway "%s"' % gateway_module_name)
 
 		# XXX: may want facility for running multiple instances of the same gateway plugin, with unique names/config?
 		gateway_instance_name = gateway_module_name # for now
