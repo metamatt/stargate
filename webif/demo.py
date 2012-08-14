@@ -175,7 +175,7 @@ def enumerate_outputs_by_area(area_id, filterdesc):
 	return render_template('outputList.html', area_filter = area, devices = outputs, active_filter = devfilter)
 
 @app.route('/area/<int:area_id>/controls/', defaults = {'filterdesc': ''})
-@app.route('/area/<int:area_id>/outputs/<filterdesc>')
+@app.route('/area/<int:area_id>/controls/<filterdesc>')
 def enumerate_controls_by_area(area_id, filterdesc):
 	area = house.get_area_by_id(area_id)
 	devfilter = house.parse_devfilter_description(devclass = 'control', descriptor = filterdesc)
