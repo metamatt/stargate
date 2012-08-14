@@ -7,6 +7,9 @@
 # one client at a time).
 #
 # Terminology note: 'cmdline' variable holds encoded command with checksum but no CRLF terminator
+#
+# BUGS:
+# - reflector is largely untested
 
 import logging
 import socket

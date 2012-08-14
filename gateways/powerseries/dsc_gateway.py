@@ -6,18 +6,15 @@
 # sensors/devices controlled via a DSC PowerSeries alarm and IT-100
 # or Envisalink 2DS integration module.
 #
-# BUGS:
-# - reflector is largely untested
 # TODO:
-# - clean up/flesh out cache; settle on way of doing device ids across zone/partition/other
 # - figure out how to model keyfob events
 # - persistence, change tracking
 
 import logging
 
 import sg_house
-import dsc_panel
-import dsc_reflector
+from dsc_panel import DscPanelServer
+from dsc_reflector import Reflector
 
 
 logger = logging.getLogger(__name__)
@@ -94,9 +91,9 @@ class DscGateway(sg_house.StargateGateway):
 			self.partitions_by_id[partition_num] = DscPartition(self, partition_num, config.partition_names[partition_num])
 
 		# set up network connections
-		self.panel_server = dsc_panel.DscPanelServer(self, config.gateway.hostname, 4025, config.gateway.password)
+		self.panel_server = DscPanelServer(self, config.gateway.hostname, 4025, config.gateway.password)
 		if config.gateway.has_key('reflector_port'):
-			self.reflector = dsc_reflector.Reflector(self, config.gateway.reflector_port, config.gateway.password)
+			self.reflector = Reflector(self, config.gateway.reflector_port, config.gateway.password)
 		else:
 			self.reflector = None
 

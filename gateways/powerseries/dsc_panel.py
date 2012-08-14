@@ -8,6 +8,9 @@
 # state and invoking actions.
 #
 # Terminology note: 'cmdline' variable holds encoded command with checksum but no CRLF terminator
+#
+# TODO:
+# - clean up/flesh out cache; settle on way of doing device ids across zone/partition/other
 
 import logging
 import select
@@ -24,13 +27,13 @@ class DscPanelCache(object):
 	partition_status = {}
 	subscribers = []
 
-	def __init__(self, gateway):
-		self.gateway = gateway
+	def __init__(self, panel_server):
+		self.panel_server = panel_server
 		for i in range(1, 65):
 			self.zone_status[i] = 'stale'
 		for i in range(1, 9):
 			self.partition_status[i] = 'stale'
-		self.gateway.send_dsc_command(001) # request global status
+		self.panel_server.send_dsc_command(001) # request global status
 
 	def get_zone_status(self, zone_num):
 		status = self.zone_status[zone_num]
@@ -41,13 +44,13 @@ class DscPanelCache(object):
 
 	# DscGateway private interface
 	def _record_zone_status(self, zone_num, status):
-		# should be called only by DscGateway._receive_dsc_cmd()
+		# should be called only by DscPanelServer._receive_dsc_cmd()
 		logger.info('_record_zone_state: zone %d status %d' % (zone_num, status))
 		self.zone_status[zone_num] = status
 		self._broadcast_change(zone_num, status)
 
 	def _record_partition_status(self, partition_num, status):
-		# should be called only by DscGateway._receive_dsc_cmd()
+		# should be called only by DscPanelServer._receive_dsc_cmd()
 		logger.info('_record_partition_state: partition %d status %d' % (partition_num, status))
 		self.partition_status[partition_num] = status
 		self._broadcast_change(partition_num, status)
