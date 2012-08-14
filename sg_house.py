@@ -24,7 +24,7 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class StargateDeviceFilter(object):
-	DEVICE_CLASSES = set(['control', 'output'])
+	DEVICE_CLASSES = set([ 'control', 'output', 'sensor' ])
 	devclass = None # element of DEVICE_CLASSES
 	devtype = None # string dependent on devclass
 	devstate = None # string dependent on devtype

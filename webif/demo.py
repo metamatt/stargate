@@ -144,6 +144,23 @@ def set_outputs_to_state():
 	return redirect(url_for('enumerate_outputs_by_area', area_id = output.area.area_id, filterdesc = output.devtype))
 
 #####################
+# Sensors
+################
+
+@app.route('/sensors/', defaults = {'filterdesc': ''})
+@app.route('/sensors/<filterdesc>')
+def enumerate_sensors(filterdesc):
+	devfilter = house.parse_devfilter_description(devclass = 'sensor', descriptor = filterdesc)
+	sensors = house.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', devices = sensors, active_filter = devfilter)
+
+@app.route('/sensor/<int:dev_id>')
+def get_sensor(dev_id):
+	sensor = house.get_device_by_id(dev_id)
+	assert sensor.devclass == 'sensor'
+	return render_template('output.html', device = sensor)
+
+#####################
 # Areas
 ################
 
@@ -181,6 +198,14 @@ def enumerate_controls_by_area(area_id, filterdesc):
 	devfilter = house.parse_devfilter_description(devclass = 'control', descriptor = filterdesc)
 	controls = area.get_devices_filtered_by(devfilter)
 	return render_template('outputList.html', area_filter = area, devices = controls, active_filter = devfilter)
+
+@app.route('/area/<int:area_id>/sensors/', defaults = {'filterdesc': ''})
+@app.route('/area/<int:area_id>/sensors/<filterdesc>')
+def enumerate_sensors_by_area(area_id, filterdesc):
+	area = house.get_area_by_id(area_id)
+	devfilter = house.parse_devfilter_description(devclass = 'sensors', descriptor = filterdesc)
+	sensors = area.get_devices_filtered_by(devfilter)
+	return render_template('outputList.html', area_filter = area, devices = sensors, active_filter = devfilter)
 
 @app.route('/debug_break')
 def debug_break():

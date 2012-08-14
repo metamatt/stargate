@@ -12,7 +12,6 @@
 # - clean up/flesh out cache; settle on way of doing device ids across zone/partition/other
 # - figure out how to model keyfob events
 # - split into modules
-# - add 'sensor' devclass?
 # - persistence, change tracking
 
 import logging
@@ -37,7 +36,8 @@ class DscPanel(sg_house.StargateDevice):
 		super(DscPanel, self).__init__(gateway.house, area, gateway, 'panel', 'DSC PowerSeries')
 
 	# as control: read of events mapped to keyfob buttons, but what object do those land on?
-	
+
+
 class DscPartition(sg_house.StargateDevice):
 	KNOWN_STATES_IN_ORDER = [ 'ready', 'trouble', 'armed' ]
 
@@ -48,13 +48,14 @@ class DscPartition(sg_house.StargateDevice):
 		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition%d' % partition_num, name)
 
 	# as a control: this should be able to arm/disarm (read and write)
-	
+
+
 class DscZoneSensor(sg_house.StargateDevice):
 	KNOWN_STATES_IN_ORDER = [ 'closed', 'open' ]
 
 	def __init__(self, gateway, area, zone_number, name):
-		self.devclass = 'control'
-		self.devtype = 'sensor' # XXX should this be a devclass?
+		self.devclass = 'sensor'
+		self.devtype = 'closure'
 		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone%d' % zone_number, name)
 		self.open_state = None
 		self.zone_number = zone_number
