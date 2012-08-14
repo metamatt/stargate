@@ -27,8 +27,8 @@ logging:
     # loglevels for plugin modules
     level.gateways.radiora2.ra_repeater: debug
     level.gateways.radiora2.ra_repeater.listener: info
-    level.gateways.powerseries.dsc_gateway: debug
-    level.gateways.powerseries.dsc_gateway.listener: info
+    level.gateways.powerseries: debug
+    level.gateways.powerseries.dsc_panel.listener: info
 
 # webserver configuration (for UI and API)
 server:
@@ -64,7 +64,7 @@ gateways:
             poll_interval: 5 # in seconds
 
     powerseries:
-        disabled: true # optional, default false, uncomment to disable while testing
+        # disabled: true # optional, default false, uncomment to disable while testing
         gateway:
             hostname: envisalink
             password: user
