@@ -30,9 +30,9 @@ class StargateDeviceFilter(object):
 	devstate = None # string dependent on devtype
 	
 	def __init__(self, devclass = None, devtype = None, devstate = None):
-		self.devclass = devclass
-		self.devtype = devtype
-		self.devstate = devstate
+		self.devclass = devclass if devclass != 'all' else None
+		self.devtype = devtype if devtype != 'all' else None
+		self.devstate = devstate if devtype != 'all' else None
 		
 	def __str__(self):
 		ss = []
@@ -116,7 +116,7 @@ class StargateDevice(object):
 		if hasattr(self, handler):
 			return getattr(self, handler)()
 		# default answer based on class/type
-		if state == 'all' or state == self.devclass or state == self.devtype:
+		if state == self.devclass or state == self.devtype:
 			return True
 		return False
 
