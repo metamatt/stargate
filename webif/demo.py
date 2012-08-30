@@ -224,7 +224,8 @@ def stash_house(theHouse):
 
 def start(theHouse, port = None, public = False, webdebug = False):
 	# save house object for handler classes to use
-	stash_house(theHouse)
+	if theHouse:
+		stash_house(theHouse)
 
 	# start webserver
 	app_args = {}
