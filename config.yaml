@@ -14,7 +14,7 @@ database:
     datafile: stargate.sqlite
     # checkpoint_interval: how often to track time consumed by devices that
     # have not changed state, in seconds; default 3600 (1 hour)
-    checkpoint_interval: 5
+    checkpoint_interval: 3600
 
 # logfile, for debugging
 logging:
