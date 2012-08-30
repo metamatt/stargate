@@ -22,11 +22,10 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class DscPanel(sg_house.StargateDevice):
-	KNOWN_STATES_IN_ORDER = [ 'placeholder' ]
+	devclass = 'control' # XXX: is it? compound/parent might be better, with a bunch of outputs and controls underneath.
+	devtype = 'repeater' # XXX
 
 	def __init__(self, gateway):
-		self.devclass = 'control' # XXX: is it? compound/parent might be better, with a bunch of outputs and controls underneath.
-		self.devtype = 'placeholder'
 		area = gateway.house # XXX for now
 		super(DscPanel, self).__init__(gateway.house, area, gateway, 'panel', 'DSC PowerSeries')
 
@@ -34,11 +33,11 @@ class DscPanel(sg_house.StargateDevice):
 
 
 class DscPartition(sg_house.StargateDevice):
-	KNOWN_STATES_IN_ORDER = [ 'ready', 'trouble', 'armed' ]
+	devclass = 'control'
+	devtype = 'alarmpartition'
+	possible_states = [ 'ready', 'trouble', 'armed' ]
 
 	def __init__(self, gateway, partition_num, name):
-		self.devclass = 'control'
-		self.devtype = 'alarmpartition'
 		area = gateway.house # XXX for now
 		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition%d' % partition_num, name)
 
@@ -46,11 +45,11 @@ class DscPartition(sg_house.StargateDevice):
 
 
 class DscZoneSensor(sg_house.StargateDevice):
-	KNOWN_STATES_IN_ORDER = [ 'closed', 'open' ]
+	devclass = 'sensor'
+	devtype = 'closure'
+	possible_states = [ 'closed', 'open' ]
 
 	def __init__(self, gateway, area, zone_number, name):
-		self.devclass = 'sensor'
-		self.devtype = 'closure'
 		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone%d' % zone_number, name)
 		self.open_state = None
 		self.zone_number = zone_number

@@ -8,44 +8,7 @@ import time
 from flask import Flask, request, render_template, redirect, url_for
 
 app = Flask(__name__)
-house = None
-
-# XXX need to extend this concept beyond radiora2
-import gateways.radiora2.ra_gateway as ra_gateway
-def order_device_states(states, devclass = 'device'):
-	if devclass == 'output':
-		return ra_gateway.OutputDevice.order_states(states)
-	elif devclass == 'control':
-		return ra_gateway.ControlDevice.order_states(states)
-	else:
-		return ra_gateway.LutronDevice.order_states(states)
-
-
-def human_readable_timedelta(delta, text_if_none = 'unknown'):
-	if not delta:
-		return text_if_none
-	if type(delta) != datetime.timedelta:
-		delta = datetime.timedelta(seconds = delta)
-	if delta == datetime.timedelta(0): # XXX should we consider time less than a second as 'right now' or 'less than a second'?
-		return 'right now' # XXX in some contexts, 'no time' -- 'changed no time ago', 'changed right now', 'on since right now'...
-
-	days = delta.days
-	hours, remainder = divmod(delta.seconds, 3600)
-	minutes, seconds = divmod(remainder, 60)
-	
-	tokens = []
-	tokens.append('%d day%s' % (days, '' if days == 1 else 's')) if days else None
-	tokens.append('%d hour%s' % (hours, '' if hours == 1 else 's')) if hours else None
-	tokens.append('%d minute%s' % (minutes, '' if minutes == 1 else 's')) if minutes else None
-	tokens.append('%d second%s'% (seconds, '' if seconds == 1 else 's')) if seconds else None
-	if len(tokens):
-		return (', ').join(tokens)
-	else:
-		return 'less than a second'
-
-
-app.jinja_env.filters['order_device_states'] = order_device_states
-app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
+house = None # will be set by stash_house()
 
 
 @app.route('/')
@@ -228,11 +191,40 @@ def not_found(error = None):
 def inject_house():
 	return dict(house = house, debug = app.debug)
 
+def human_readable_timedelta(delta, text_if_none = 'unknown'):
+	if not delta:
+		return text_if_none
+	if type(delta) != datetime.timedelta:
+		delta = datetime.timedelta(seconds = delta)
+	if delta == datetime.timedelta(0): # XXX should we consider time less than a second as 'right now' or 'less than a second'?
+		return 'right now' # XXX in some contexts, 'no time' -- 'changed no time ago', 'changed right now', 'on since right now'...
+
+	days = delta.days
+	hours, remainder = divmod(delta.seconds, 3600)
+	minutes, seconds = divmod(remainder, 60)
+	
+	tokens = []
+	tokens.append('%d day%s' % (days, '' if days == 1 else 's')) if days else None
+	tokens.append('%d hour%s' % (hours, '' if hours == 1 else 's')) if hours else None
+	tokens.append('%d minute%s' % (minutes, '' if minutes == 1 else 's')) if minutes else None
+	tokens.append('%d second%s'% (seconds, '' if seconds == 1 else 's')) if seconds else None
+	if len(tokens):
+		return (', ').join(tokens)
+	else:
+		return 'less than a second'
+
+def stash_house(theHouse):
+	global house
+	house = theHouse
+
+	app.jinja_env.filters['order_device_states'] = house.order_device_states
+	app.jinja_env.filters['order_device_types'] = house.order_device_states # XXX
+	app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
+
 
 def start(theHouse, port = None, public = False, webdebug = False):
 	# save house object for handler classes to use
-	global house
-	house = theHouse
+	stash_house(theHouse)
 
 	# start webserver
 	app_args = {}

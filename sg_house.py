@@ -61,22 +61,18 @@ class StargateDevice(object):
 	# XXX the above is becoming less true as I hoist more stuff here from LutronDevice.
 	# Rethink, rewrite, recomment.
 	
-	# XXX default order_states() implementation -- should not be called -- and we need
-	# a way for gateways to register this, and for the framework to aggregate them,
-	# instead of hardcoding. (Right now demo.py "aggregates" by hardcoding radiora2.)
-	@staticmethod
-	def order_states(states):
-		return states
-
 	# predefined fields that all devices must have, all subclasses must fill in
 	house = None            # StargateHouse instance
 	area = None             # StargateArea instance, where this device lives
 	gateway = None          # StargateGateway instance, the gateway module managing this device
 	gateway_devid = None    # String, the id for this device (unique and meaningful only per gateway)
 	name = None             # String, human-readable name
+	devclass = None         # String, device class (must be known to StargateDeviceFilter.DEVICE_CLASSES)
+	devtype = None          # String, device type (meaning depends on devclass)
+	possible_states = []    # List of strings, possible states (meaning depends on devtype)
 	_possible_states = None # Memoization for get_possible_states()
 	_possible_actions = None# Memoization for get_possible_actions()
-
+	
 	def __init__(self, house, area, gateway, gateway_devid, name):
 		# for now, we require devclass to have been set by subclass; not really good design
 		assert self.devclass in StargateDeviceFilter.DEVICE_CLASSES
@@ -130,14 +126,15 @@ class StargateDevice(object):
 	def get_current_states(self):
 		return [state for state in self.get_possible_states() if self.is_in_state(state)]
 
+	# XXX see if these still make sense
 	def get_possible_states(self):
 		if not self._possible_states:
-			self._possible_states = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'is_' + state)])
+			self._possible_states = set([state for state in self.possible_states if hasattr(self, 'is_' + state)])
 		return self._possible_states
 
 	def get_possible_actions(self):
 		if not self._possible_actions:
-			self._possible_actions = set([state for state in self.KNOWN_STATES_IN_ORDER if hasattr(self, 'be_' + state)])
+			self._possible_actions = set([state for state in self.possible_states if hasattr(self, 'be_' + state)])
 		return self._possible_actions
 	
 	def get_delta_since_change(self):
@@ -287,10 +284,14 @@ class StargateHouse(StargateArea):
 		devstate = filters[1] if len(filters) > 1 else None
 		return StargateDeviceFilter(devclass, devtype, devstate)
 
-	# XXX find a home for, or rework, this concept
 	@staticmethod
 	def get_available_common_actions(devices):
 		return reduce(set.intersection, map(lambda dev: dev.get_possible_actions(), devices))
+	
+	# XXX should replace this with several functions; templates call this on devtype and states, and know which.
+	def order_device_states(self, states, devclass):
+		# return [state for state in self.state_order if state in states]
+		return states
 
 
 class StargateGateway(object):

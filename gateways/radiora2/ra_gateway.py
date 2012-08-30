@@ -20,10 +20,6 @@ class LutronDevice(sg_house.StargateDevice):
 	# and we will subclass as "OutputDevice") and inputs/controls (what Lutron calls an "input", I
 	# would typically call a "keypad", and we will subclass as "ControlDevice").
 
-	@staticmethod
-	def order_states(states):
-		return [state for state in (OutputDevice.KNOWN_STATES_IN_ORDER[:-1] + ControlDevice.KNOWN_STATES_IN_ORDER) if state in states]
-
 	iid = None
 	devclass = None
 	devtype = None
@@ -39,11 +35,6 @@ class LutronDevice(sg_house.StargateDevice):
 
 class OutputDevice(LutronDevice):
 	# Common device subclass for controllable outputs (lights, shades, appliances).
-
-	KNOWN_STATES_IN_ORDER = [ 'light', 'closed', 'off', 'half', 'on', 'shade', 'open', 'contactclosure', 'all' ]
-	@staticmethod
-	def order_states(states):
-		return [state for state in OutputDevice.KNOWN_STATES_IN_ORDER if state in states]
 
 	def __init__(self, ra_area, device_spec):
 		super(OutputDevice, self).__init__('output', ra_area, device_spec.iid, device_spec.name)
@@ -65,9 +56,11 @@ class OutputDevice(LutronDevice):
 	
 
 class SwitchedOutput(OutputDevice):
+	devtype = 'light'
+	possible_states = [ 'off', 'on' ]
+
 	def __init__(self, ra_area, device_spec):
 		super(SwitchedOutput, self).__init__(ra_area, device_spec)
-		self.devtype = 'light'
 
 	def is_on(self):
 		return self.get_level() > 0
@@ -83,19 +76,23 @@ class SwitchedOutput(OutputDevice):
 
 
 class DimmedOutput(SwitchedOutput):
+	possible_states = [ 'off', 'half', 'on' ]
+	level_step = 1
+
 	def __init__(self, ra_area, device_spec):
 		super(DimmedOutput, self).__init__(ra_area, device_spec)
-		self.level_step = 1
 
 	def be_half(self):
 		self.set_level(50)
 
 
 class ShadeOutput(OutputDevice):
+	devtype = 'shade'
+	possible_states = [ 'open', 'half', 'closed' ]
+	level_step = 1
+
 	def __init__(self, ra_area, device_spec):
 		super(ShadeOutput, self).__init__(ra_area, device_spec)
-		self.devtype = 'shade'
-		self.level_step = 1
 	
 	def be_half(self):
 		self.set_level(50)
@@ -120,23 +117,25 @@ class ShadeOutput(OutputDevice):
 
 
 class ContactClosureOutput(OutputDevice):
+	devtype = 'contactclosure'
+	possible_states = [ 'active', 'inactive' ]
+
 	def __init__(self, ra_area, device_spec):
 		super(ContactClosureOutput, self).__init__(ra_area, device_spec)
 		self.pulsed = device_spec.get_type() == 'CCO_PULSED'
-		self.devtype = 'contactclosure'
 
 	# XXX does it make more sense to people to define the states for CCOs as
 	# open/closed or on/off?
-	def is_closed(self):
+	def is_inactive(self):
 		return self.get_level() == 0
 
-	def be_closed(self):
+	def be_inactive(self):
 		self.set_level(0)
 
-	def is_open(self):
+	def is_active(self):
 		return self.get_level() > 0
 
-	def be_open(self):
+	def be_active(self):
 		self.set_level(100)
 
 	def get_name_for_level(self, level):
@@ -145,11 +144,6 @@ class ContactClosureOutput(OutputDevice):
 
 class ControlDevice(LutronDevice):
 	# Common device subclass for controls (keypads, remotes, repeater/receiver buttons).
-
-	KNOWN_STATES_IN_ORDER = [ 'keypad', 'remote', 'repeater', 'all' ]
-	@staticmethod
-	def order_states(states):
-		return [state for state in ControlDevice.KNOWN_STATES_IN_ORDER if state in states]
 
 	def __init__(self, ra_area, device_spec):
 		super(ControlDevice, self).__init__('control', ra_area, device_spec.iid, device_spec.name)
@@ -179,9 +173,10 @@ class KeypadButton(object):
 
 
 class KeypadDevice(ControlDevice):
+	devtype = 'keypad'
+
 	def __init__(self, ra_area, device_spec):
 		super(KeypadDevice, self).__init__(ra_area, device_spec)
-		self.devtype = 'keypad'
 		self.buttons = dict()
 		for button_id in device_spec.buttons.keys():
 			led_cid = button_id + 80 # it just works out that way
@@ -217,15 +212,11 @@ class KeypadDevice(ControlDevice):
 
 
 class RemoteKeypadDevice(KeypadDevice):
-	def __init__(self, ra_area, device_spec):
-		super(RemoteKeypadDevice, self).__init__(ra_area, device_spec)
-		self.devtype = 'remote'
+	devtype = 'remote'
 
 
 class RepeaterKeypadDevice(KeypadDevice):
-	def __init__(self, ra_area, device_spec):
-		super(RepeaterKeypadDevice, self).__init__(ra_area, device_spec)
-		self.devtype = 'repeater'
+	devtype = 'repeater'
 
 
 def create_device_for_output(ra_area, output_spec):

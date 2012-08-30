@@ -27,8 +27,9 @@ logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 class VeraDevice(sg_house.StargateDevice):
+	devclass = 'output'
+
 	def __init__(self, gateway, dev_sdata):
-		self.devclass = 'output'
 		self.vera_room = gateway.rooms[dev_sdata.room]
 		self.vera_id = dev_sdata.id
 		super(VeraDevice, self).__init__(gateway.house, self.vera_room.sg_area, gateway, str(self.vera_id), dev_sdata.name)
@@ -40,13 +41,13 @@ class VeraDevice(sg_house.StargateDevice):
 	
 
 class VeraDoorLock(VeraDevice):
-	KNOWN_STATES_IN_ORDER = [ 'pending', 'unlocked', 'locked' ]
+	devtype = 'doorlock'
+	possible_states = [ 'pending', 'unlocked', 'locked' ]
 	service_id = 'urn:micasaverde-com:serviceId:DoorLock1'
 	lock_state_var = 'Status'
 
 	def __init__(self, gateway, dev_sdata):
 		super(VeraDoorLock, self).__init__(gateway, dev_sdata)
-		self.devtype = 'doorlock'
 		self.level_step = self.level_max = 1
 		self.last_locked_state = int(dev_sdata.locked)
 		self.house.persist.init_device_state(self.gateway.gateway_id, self.vera_id, self.last_locked_state)
