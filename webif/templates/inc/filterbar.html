@@ -17,7 +17,7 @@ matching filter:
 {% for type in type_state_map | order_device_types(devclass = devclass) %}
 	{{ decorate_active(type) }}
 
-	{% set states = type_state_map[type] | order_device_states(devclass = devclass) %}
+	{% set states = type_state_map[type] | order_device_states(devclass = devclass, devtype = type) %}
 	{% if states|length %}
 		(
 		{% for state in states %}

@@ -15,7 +15,7 @@
 		: {{ device.get_level() }}
 	{% endif %}
 	
-	{% for state in device.get_possible_actions() | order_device_states(devclass = 'output') %}
+	{% for state in device.get_possible_actions() | order_device_states(devclass = 'output', devtype = device.devtype) %}
 		| {{ emit_set_to_state_link(state) }}
 	{% endfor %}
 	

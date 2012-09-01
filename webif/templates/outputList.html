@@ -22,7 +22,7 @@
 			<form name="{{ commonActionForm }}" action="{{ url_for('set_outputs_to_state') }}" method="post">
 				{{ count_list_items(type_group.list, type_group.grouper) }}
 			
-				{% set common_actions = house.get_available_common_actions(type_group.list) | order_device_states(devclass = devclass) %}
+				{% set common_actions = house.get_available_common_actions(type_group.list) | order_device_states(devclass = devclass, devtype = type_group.grouper) %}
 				{% if common_actions|length %}
 					<input type="hidden" name="outputs" value="{{ type_group.list | join(',', attribute = 'device_id') }}">
 					<input type="hidden" name="state" value="">

@@ -24,7 +24,7 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class StargateDeviceFilter(object):
-	DEVICE_CLASSES = set([ 'control', 'output', 'sensor' ])
+	DEVICE_CLASSES = [ 'control', 'sensor', 'output' ]
 	devclass = None # element of DEVICE_CLASSES
 	devtype = None # string dependent on devclass
 	devstate = None # string dependent on devtype
@@ -229,6 +229,9 @@ class StargateHouse(StargateArea):
 	areas_by_name = None            # Map from area name to area object
 	devices_by_id = None            # Map from device id to device object
 	areas_by_id = None              # Map from area id to area object
+	devclass_order = StargateDeviceFilter.DEVICE_CLASSES # List of devclass values, in sort order
+	devtype_order_by_devclass = {}  # Map from devclass to list of devtype values, in sort order
+	devstate_order_by_tc = {}       # Map from devclass:devtype to list of devstate values, in sort order
 
 	def __init__(self, config):
 		# ordering is very important here!
@@ -259,6 +262,8 @@ class StargateHouse(StargateArea):
 	def _register_device(self, device):
 		did = self.persist.get_device_id(device.gateway.gateway_id, device.gateway_devid)
 		self.devices_by_id[did] = device
+		self._add_devtype_for_ordering(device.devclass, device.devtype)
+		self._add_devstates_for_ordering(device.devclass, device.devtype, device.possible_states)
 		return did
 	
 	def _register_area(self, area):
@@ -287,11 +292,78 @@ class StargateHouse(StargateArea):
 	@staticmethod
 	def get_available_common_actions(devices):
 		return reduce(set.intersection, map(lambda dev: dev.get_possible_actions(), devices))
+
+	def _add_devtype_for_ordering(self, devclass, devtype):
+		# make sure class key exists
+		if not self.devtype_order_by_devclass.has_key(devclass):
+			self.devtype_order_by_devclass[devclass] = []
+		# organize by class (control|sensor|output), then by type (alphabetical?)
+		if devtype not in self.devtype_order_by_devclass[devclass]:
+			self.devtype_order_by_devclass[devclass].append(devtype)
+			self.devtype_order_by_devclass[devclass].sort() # XXX: just alphabetical for now; do these have a natural order better than this?
+
+	def _add_devstates_for_ordering(self, devclass, devtype, devstates):
+		# Allow multiple calls for same devclass/devtype, each supplying a partial order of devstates, as long as the multiple partial orders don't conflict.
+		# That is, one output:light can say "on off" and another can say "on half off", but the second one can't say "off half on". In the event someone
+		# breaks this rule, we complain and tie goes to whoever was first.
+		tc = '%s:%s' % (devclass, devtype)
+		
+		# Merge new states into existing states
+		#
+		# Temporary algorithm:
+		# - iterate the incoming states; for each state see if we've already got it in the existing state order list
+		# - if yes: add the front of the existing state order list (up to that point) to the new state order list
+		# - if no: add the newly seen state to the new state order list
+		#
+		# XXX this is a hacky incomplete way of doing this; depends on some overlap between each device's idea of states;
+		# a correct implementation would need to keep all the constraints around, and do a topological sort when the
+		# constraints change.
+		old_order = self.devstate_order_by_tc[tc] if self.devstate_order_by_tc.has_key(tc) else []
+		new_order = []
+		for state in devstates:
+			try:
+				old_index = old_order.index(state) + 1 # index inclusive of the sought state
+				# assuming that worked, we slice that much off the old list, and add it to the new list
+				new_order.extend(old_order[:old_index])
+				old_order = old_order[old_index:]
+			except ValueError:
+				# this state is new; append it at this point in the new list
+				new_order.append(state)
+		self.devstate_order_by_tc[tc] = new_order
 	
-	# XXX should replace this with several functions; templates call this on devtype and states, and know which.
-	def order_device_states(self, states, devclass):
-		# return [state for state in self.state_order if state in states]
-		return states
+	def order_device_states(self, states, devclass = None, devtype = None):
+		# get list of devclasses whose devtypes to iterate
+		if devclass and devclass != 'device':
+			classes = [devclass]
+		else:
+			classes = self.devclass_order
+		# iterate devclass list to build list of devtypes
+		tcs = []
+		for dc in classes:
+			for dt in self.devtype_order_by_devclass[dc]:
+				if dt is None or dt == devtype:
+					tcs.append('%s:%s' % (dc, dt))
+		# iterate flattened class/type list to build list of devstates
+		order = []
+		for tc in tcs:
+			order.extend(self.devstate_order_by_tc[tc])
+		order.append('all')
+		# order the input list by the criteria we just built
+		return [state for state in order if state in states]
+		
+	def order_device_types(self, types, devclass = None):
+		# get list of devclasses whose devtypes to iterate
+		if devclass and devclass != 'device':
+			classes = [devclass]
+		else:
+			classes = self.devclass_order
+		# iterate devclass list to build list of devtypes
+		order = []
+		for devclass in classes:
+			order.extend(self.devtype_order_by_devclass[devclass])
+		order.append('all')
+		# order the input list by the criteria we just built
+		return [t for t in order if t in types]
 
 
 class StargateGateway(object):

@@ -218,7 +218,7 @@ def stash_house(theHouse):
 	house = theHouse
 
 	app.jinja_env.filters['order_device_states'] = house.order_device_states
-	app.jinja_env.filters['order_device_types'] = house.order_device_states # XXX
+	app.jinja_env.filters['order_device_types'] = house.order_device_types
 	app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
 
 
