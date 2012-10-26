@@ -31,6 +31,15 @@ class LutronDevice(sg_house.StargateDevice):
 		self.ra_area = ra_area
 		self.iid = iid
 		self.gateway._register_device(self)
+		
+	def on_user_action(self, level, synthetic):
+		self.event_persist_level = level # XXX need better name. Want to store bool state (on/off) and int details (brightness or whatever?)
+		self.house.events.on_device_state_change(self, synthetic) # state
+		
+	# XXX these as well need better names
+	def get_event_persist_state(self):
+		return self.event_persist_level
+	# don't override get_event_persist_details (which base class should implement as returning None)
 
 
 class OutputDevice(LutronDevice):
@@ -50,9 +59,11 @@ class OutputDevice(LutronDevice):
 	def get_name_for_level(self, level):
 		return 'on' if level > 0 else 'off'
 
-	def on_user_action(self, level, refresh):
-		assert level == self.get_level()
-		self.gateway._on_device_state_change(self.iid, level > 0, refresh)
+	def get_event_persist_state(self):
+		return self.event_persist_level > 0
+
+	def get_event_persist_details(self):
+		return self.event_persist_level
 	
 
 class SwitchedOutput(OutputDevice):
@@ -204,9 +215,6 @@ class KeypadDevice(ControlDevice):
 	def get_level(self):
 		return self.get_num_buttons_pressed()
 
-	def on_user_action(self, state, refresh):
-		self.gateway._on_device_state_change(self.iid, state, refresh)
-
 	def get_name_for_level(self, level):
 		return 'pressed' if level > 0 else 'unpressed'
 
@@ -328,13 +336,6 @@ class RaGateway(sg_house.StargateGateway):
 		sg_area = self.house.get_area_by_name(ra_area.name)
 		return sg_area
 
-	# private interface for owned objects to talk to persistence layer
-	def _on_device_state_change(self, iid, state, refresh):
-		if refresh:
-			self.house.persist.init_device_state(self.gateway_id, iid, state)
-		else:
-			self.house.persist.on_device_state_change(self.gateway_id, iid, state)
-		
 	# private interface for owned objects to talk to repeater
 	def _get_output_level(self, iid):
 		return self.repeater.get_output_level(iid)

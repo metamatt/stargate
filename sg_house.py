@@ -7,6 +7,7 @@
 
 import logging
 
+import events
 import gateways
 import persistence
 
@@ -225,6 +226,7 @@ class StargateArea(object):
 
 class StargateHouse(StargateArea):
 	persist = None                  # SgPersistence instance
+	events = None                   # SgEvents instance
 	gateways_by_name = None         # Map from gateway name to gateway object
 	areas_by_name = None            # Map from area name to area object
 	devices_by_id = None            # Map from device id to device object
@@ -238,6 +240,7 @@ class StargateHouse(StargateArea):
 		# need to be mostly complete before calling StargateArea initializer
 		self.house = self
 		self.persist = persistence.SgPersistence(config.database)
+		self.events = events.SgEvents(self.persist)
 		self.areas_by_name = {}
 		self.devices_by_id = {}
 		self.areas_by_id = {}

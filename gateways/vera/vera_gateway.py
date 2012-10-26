@@ -50,7 +50,7 @@ class VeraDoorLock(VeraDevice):
 		super(VeraDoorLock, self).__init__(gateway, dev_sdata)
 		self.level_step = self.level_max = 1
 		self.last_locked_state = int(dev_sdata.locked)
-		self.house.persist.init_device_state(self.gateway.gateway_id, self.vera_id, self.last_locked_state)
+		self.house.events.on_device_state_change(self, synthetic = True)
 
 	def is_locked(self):
 		return self.get_level() == 1
@@ -78,8 +78,11 @@ class VeraDoorLock(VeraDevice):
 		locked = int(dev_sdata.locked)
 		logger.debug('device %s state last %d now %d' % (self.name, self.last_locked_state, locked))
 		if locked != self.last_locked_state:
-			self.house.persist.on_device_state_change(self.gateway.gateway_id, self.vera_id, locked)
 			self.last_locked_state = locked
+			self.house.events.on_device_state_change(self)
+			
+	def get_event_persist_state(self):
+		return self.last_locked_state
 
 
 class VeraRoom(object):
