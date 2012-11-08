@@ -42,7 +42,7 @@ class VeraDevice(sg_house.StargateDevice):
 
 class VeraDoorLock(VeraDevice):
 	devtype = 'doorlock'
-	possible_states = [ 'pending', 'unlocked', 'locked' ]
+	possible_states = ( 'pending', 'unlocked', 'locked' )
 	service_id = 'urn:micasaverde-com:serviceId:DoorLock1'
 	lock_state_var = 'Status'
 
@@ -65,11 +65,11 @@ class VeraDoorLock(VeraDevice):
 		self.set_level(0)
 		
 	def get_level(self):
-		return self.gateway._luup_get_variable(self.service_id, self.vera_id, self.lock_state_var)
+		return self.gateway._luup_get_variable(VeraDoorLock.service_id, self.vera_id, VeraDoorLock.lock_state_var)
 		
 	def set_level(self, level):
 		target = 1 if level else 0
-		self.gateway._luup_set_variable_target(self.service_id, self.vera_id, self.lock_state_var, target)
+		self.gateway._luup_set_variable_target(VeraDoorLock.service_id, self.vera_id, VeraDoorLock.lock_state_var, target)
 		
 	def get_name_for_level(self, level):
 		return 'locked' if level else 'unlocked'
@@ -86,10 +86,6 @@ class VeraDoorLock(VeraDevice):
 
 
 class VeraRoom(object):
-	gateway = None
-	sg_area = None
-	vera_room = None
-	
 	def __init__(self, gateway, vera_room):
 		self.gateway = gateway
 		self.vera_room = vera_room
@@ -122,6 +118,7 @@ class VeraGateway(sg_house.StargateGateway):
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
+		# XXX this is uncalled, and probably would get strings instead of ints
 		assert isinstance(gateway_devid, int)
 		vera_id = int(gateway_devid)
 		return self.devices[vera_id]

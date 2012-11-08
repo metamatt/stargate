@@ -19,15 +19,12 @@ class LutronDevice(sg_house.StargateDevice):
 	# Individual RadioRa device -- includes both controllable outputs (what Lutron calls an "output")
 	# and we will subclass as "OutputDevice") and inputs/controls (what Lutron calls an "input", I
 	# would typically call a "keypad", and we will subclass as "ControlDevice").
-
-	iid = None
-	devclass = None
-	devtype = None
-	level_max = 100
 	
 	def __init__(self, devclass, ra_area, iid, name):
 		self.devclass = devclass
 		super(LutronDevice, self).__init__(ra_area.house, ra_area.sg_area, ra_area.gateway, str(iid), name)
+		self.iid = None
+		self.level_max = 100
 		self.ra_area = ra_area
 		self.iid = iid
 		self.gateway._register_device(self)
@@ -68,7 +65,7 @@ class OutputDevice(LutronDevice):
 
 class SwitchedOutput(OutputDevice):
 	devtype = 'light'
-	possible_states = [ 'off', 'on' ]
+	possible_states = ( 'off', 'on' )
 
 	def __init__(self, ra_area, device_spec):
 		super(SwitchedOutput, self).__init__(ra_area, device_spec)
@@ -87,7 +84,7 @@ class SwitchedOutput(OutputDevice):
 
 
 class DimmedOutput(SwitchedOutput):
-	possible_states = [ 'off', 'half', 'on' ]
+	possible_states = ( 'off', 'half', 'on' )
 	level_step = 1
 
 	def __init__(self, ra_area, device_spec):
@@ -99,7 +96,7 @@ class DimmedOutput(SwitchedOutput):
 
 class ShadeOutput(OutputDevice):
 	devtype = 'shade'
-	possible_states = [ 'open', 'half', 'closed' ]
+	possible_states = ( 'open', 'half', 'closed' )
 	level_step = 1
 
 	def __init__(self, ra_area, device_spec):
@@ -129,7 +126,7 @@ class ShadeOutput(OutputDevice):
 
 class ContactClosureOutput(OutputDevice):
 	devtype = 'contactclosure'
-	possible_states = [ 'active', 'inactive' ]
+	possible_states = ( 'active', 'inactive' )
 
 	def __init__(self, ra_area, device_spec):
 		super(ContactClosureOutput, self).__init__(ra_area, device_spec)
@@ -185,6 +182,7 @@ class KeypadButton(object):
 
 class KeypadDevice(ControlDevice):
 	devtype = 'keypad'
+	possible_states = () # XXX pressed/unpressed, but these apply to individual buttons
 
 	def __init__(self, ra_area, device_spec):
 		super(KeypadDevice, self).__init__(ra_area, device_spec)

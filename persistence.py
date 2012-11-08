@@ -45,7 +45,6 @@ AREA_MAGIC_GATEWAY_ID = '__area__'
 
 class SgPersistence(object):
 	def __init__(self, dbconfig):
-		
 		self._install_signal_handlers()
 		self._dbfilename = dbconfig.datafile
 		self._conn = sqlite3.connect(self._dbfilename, check_same_thread = False)

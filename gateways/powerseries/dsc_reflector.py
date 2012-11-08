@@ -20,10 +20,9 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class ReflectorThread(threading.Thread):
-	daemon = True
-	
 	def __init__(self, reflector):
 		super(ReflectorThread, self).__init__(name = 'dsc_reflector')
+		self.daemon = True
 		self.reflector = reflector
 		self.listen_socket = reflector.accept_socket
 		self.authenticated = False

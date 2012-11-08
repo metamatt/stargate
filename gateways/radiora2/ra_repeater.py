@@ -36,16 +36,15 @@ CRLF = '\r\n'
 
 class OutputCache(object):
 	# Low-level cache of last seen level for each device (output, button, led)
-	repeater = None
-	output_levels = {} # map from output iid to level
-	button_states = {} # map from device iid to map from button component id to state
-	led_states = {} # map from device iid to map from led component id to state
-	refreshing = set() # set of iids for which we have a refresh in progress
-	subscribers = [] # list of objects on which we will call on_user_action()
 
 	# client public interface
 	def __init__(self):
-		pass
+		self.repeater = None
+		self.output_levels = {} # map from output iid to level
+		self.button_states = {} # map from device iid to map from button component id to state
+		self.led_states = {} # map from device iid to map from led component id to state
+		self.refreshing = set() # set of iids for which we have a refresh in progress
+		self.subscribers = [] # list of objects on which we will call on_user_action()
 
 	def watch_output(self, output_iid):
 		self.output_levels[output_iid] = 'stale'
@@ -158,10 +157,9 @@ class OutputCache(object):
 
 
 class RaRepeater(object):
-	state = None
-	cache = None
-	
 	def __init__(self):
+		self.state = None
+		self.cache = None
 		self._prep_response_handlers()
 	
 	def bind_cache(self, cache):
@@ -273,11 +271,9 @@ class RaRepeater(object):
 		logger = logging.getLogger(__name__ + '.listener')
 		logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 		class RepeaterListener(threading.Thread):
-			repeater = None
-			daemon = True
-
 			def __init__(self, repeater):
 				super(RepeaterListener, self).__init__(name = 'ra_repeater')
+				self.daemon = True
 				self.repeater = repeater
 
 			def run(self):

@@ -24,6 +24,7 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 class DscPanel(sg_house.StargateDevice):
 	devclass = 'control' # XXX: is it? compound/parent might be better, with a bunch of outputs and controls underneath.
 	devtype = 'repeater' # XXX
+	possible_states = ()
 
 	def __init__(self, gateway):
 		area = gateway.house # XXX for now
@@ -35,7 +36,7 @@ class DscPanel(sg_house.StargateDevice):
 class DscPartition(sg_house.StargateDevice):
 	devclass = 'control'
 	devtype = 'alarmpartition'
-	possible_states = [ 'ready', 'trouble', 'armed' ]
+	possible_states = ( 'ready', 'trouble', 'armed' )
 
 	def __init__(self, gateway, partition_num, name):
 		area = gateway.house # XXX for now
@@ -47,7 +48,7 @@ class DscPartition(sg_house.StargateDevice):
 class DscZoneSensor(sg_house.StargateDevice):
 	devclass = 'sensor'
 	devtype = 'closure'
-	possible_states = [ 'closed', 'open' ]
+	possible_states = ( 'closed', 'open' )
 
 	def __init__(self, gateway, area, zone_number, name):
 		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone%d' % zone_number, name)
@@ -99,6 +100,13 @@ class DscGateway(sg_house.StargateGateway):
 		# and start everything in motion
 		self.panel_server.connect()
 
+	# public interface to StargateHouse
+	def get_device_by_gateway_id(self, gateway_devid):
+		# XXX this is uncalled; we need to distinguish between devtypes (zone, partition, etc)
+		assert isinstance(gateway_devid, int)
+		zone_id = int(gateway_devid)
+		return self.zones_by_id[zone_id]
+		
 	# child-device interface for device status
 	def get_zone_status(self, zone_num):
 		return self.panel_server.cache.get_zone_status(zone_num)

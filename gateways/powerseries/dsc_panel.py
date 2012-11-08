@@ -23,11 +23,10 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class DscPanelCache(object):
-	zone_status = {}
-	partition_status = {}
-	subscribers = []
-
 	def __init__(self, panel_server):
+		self.zone_status = {}
+		self.partition_status = {}
+		self.subscribers = []
 		self.panel_server = panel_server
 		for i in range(1, 65):
 			self.zone_status[i] = 'stale'
@@ -63,10 +62,9 @@ class DscPanelCache(object):
 
 
 class CrlfSocketBuffer(object):
-	leftovers = ''
-
 	def __init__(self, socket):
 		self.socket = socket
+		self.leftovers = ''
 	
 	def read_lines(self):
 		new_data = self.socket.recv(1024)
@@ -77,12 +75,11 @@ class CrlfSocketBuffer(object):
 
 
 class ListenerThread(threading.Thread):
-	daemon = True
-	logger = logging.getLogger(__name__ + '.listener')
-	logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
-
 	def __init__(self, gateway):
 		super(ListenerThread, self).__init__(name = 'dsc_listener')
+		self.daemon = True
+		self.logger = logging.getLogger(__name__ + '.listener')
+		self.logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 		self.gateway = gateway
 		self.socket = gateway.socket
 		

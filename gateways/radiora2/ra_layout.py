@@ -38,12 +38,9 @@ class LayoutBase(object):
 
 
 class Area(LayoutBase):
-	# An Area additionally has a list of outputs and a list of devices.
+	# An Area adds to LayoutBase a list of outputs and a list of devices.
 	# XXX The Lutron XML file also includes information about device groups,
 	#     shade groups, and area nesting which we don't (currently) model.
-
-	outputs = None
-	devices = None
 
 	def __init__(self, iid, name):
 		super(Area, self).__init__(iid, name)
@@ -70,10 +67,7 @@ class Area(LayoutBase):
 
 
 class Output(LayoutBase):
-	# An Output additionally has an associated area and a type (shade, light, etc).
-
-	area = None
-	outputType = None
+	# An Output adds to LayoutBase an associated area and a type (shade, light, etc).
 
 	def __init__(self, iid, name, outputType, area):
 		super(Output, self).__init__(iid, name)
@@ -93,13 +87,8 @@ class Output(LayoutBase):
 
 
 class Device(LayoutBase):
-	# A Device additionally has an associated area and a type (pico, seetouch, etc),
+	# A Device adds to LayoutBase an associated area and a type (pico, seetouch, etc),
 	# a list of buttons (actually a map from button id to label), and a list of LEDs.
-
-	area = None
-	deviceType = None
-	buttons = None
-	leds = None
 
 	def __init__(self, iid, name, deviceType, area):
 		super(Device, self).__init__(iid, name)
@@ -159,14 +148,12 @@ class Device(LayoutBase):
 
 
 class RaLayout(object):
-	db_dom = None
-	db_xml = None
-	areas = {} # map from iid (int) to object (Area)
-	outputs = {} # map from iid (int) to object (Output)
-	devices = {} # map from iid (int) to object (Device)
-	ignore_devices = None
-	
 	def __init__(self, ignore_devices = None):
+		self.db_dom = None
+		self.db_xml = None
+		self.areas = {} # map from iid (int) to object (Area)
+		self.outputs = {} # map from iid (int) to object (Output)
+		self.devices = {} # map from iid (int) to object (Device)
 		self.ignore_devices = ignore_devices
 	
 	def read_cached_db(self, cacheFileName):

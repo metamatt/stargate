@@ -25,14 +25,15 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class StargateDeviceFilter(object):
-	DEVICE_CLASSES = [ 'control', 'sensor', 'output' ]
-	devclass = None # element of DEVICE_CLASSES
-	devtype = None # string dependent on devclass
-	devstate = None # string dependent on devtype
+	DEVICE_CLASSES = ( 'control', 'sensor', 'output' )
 	
 	def __init__(self, devclass = None, devtype = None, devstate = None):
+		# devclass: element of DEVICE_CLASSES
 		self.devclass = devclass if devclass != 'all' else None
+		assert not self.devclass or self.devclass in StargateDeviceFilter.DEVICE_CLASSES
+		# devtype: string, legal values dependent on devclass
 		self.devtype = devtype if devtype != 'all' else None
+		# devstate: string, legal values dependent on devtype
 		self.devstate = devstate if devtype != 'all' else None
 		
 	def __str__(self):
@@ -62,31 +63,31 @@ class StargateDevice(object):
 	# XXX the above is becoming less true as I hoist more stuff here from LutronDevice.
 	# Rethink, rewrite, recomment.
 	
-	# predefined fields that all devices must have, all subclasses must fill in
-	house = None            # StargateHouse instance
-	area = None             # StargateArea instance, where this device lives
-	gateway = None          # StargateGateway instance, the gateway module managing this device
-	gateway_devid = None    # String, the id for this device (unique and meaningful only per gateway)
-	name = None             # String, human-readable name
-	devclass = None         # String, device class (must be known to StargateDeviceFilter.DEVICE_CLASSES)
-	devtype = None          # String, device type (meaning depends on devclass)
-	possible_states = []    # List of strings, possible states (meaning depends on devtype)
-	_possible_states = None # Memoization for get_possible_states()
-	_possible_actions = None# Memoization for get_possible_actions()
-	
+	# XXX Set by subclass before calling base class constructor
+	# XXX These are often implemented as subclass class attributes, so we better not assign
+	# to them in our constructor.
+	# devclass = None				# String, device class (must be known to StargateDeviceFilter.DEVICE_CLASSES)
+	# devtype = None				# String, device type (meaning depends on devclass)
+	# possible_states = ()			# List of strings, possible states (meaning depends on devtype)
+
 	def __init__(self, house, area, gateway, gateway_devid, name):
-		# for now, we require devclass to have been set by subclass; not really good design
+		self.house = house					# StargateHouse instance
+		self.area = area					# StargateArea instance, where this device lives
+		self.gateway = gateway				# StargateGateway instance, the gateway module managing this device
+		self.gateway_devid = gateway_devid	# String, the id for this device (unique and meaningful only per gateway)
+		self.name = name					# String, human-readable name
+		self._possible_states = None		# Memoization for get_possible_states()
+		self._possible_actions = None		# Memoization for get_possible_actions()
+		# for now, we require self.devclass to have been set by subclass before calling
+		# this superclass constructor; not really good design. Also, in some cases
+		# self.devclass is actually a lookup against a class variable and not an instance
+		# variable, which is a little hacky.
 		assert self.devclass in StargateDeviceFilter.DEVICE_CLASSES
 		assert isinstance(house, StargateHouse)
 		assert isinstance(area, StargateArea)
 		assert isinstance(gateway, StargateGateway)
 		assert isinstance(gateway_devid, str) or isinstance(gateway_devid, unicode)
 		assert isinstance(name, str) or isinstance(name, unicode)
-		self.house = house
-		self.area = area
-		self.gateway = gateway
-		self.gateway_devid = gateway_devid
-		self.name = name
 		# register with parent, which also registers with the house (which maintains a house-global lookup table on the unique/stable/int id it gets from the db)
 		self.device_id = area.register_device(self)
 	
@@ -159,16 +160,13 @@ class StargateArea(object):
 	# are always created by the house object, and don't need to be registered
 	# with the house object.
 	
-	name = None             # String, human-readable name
-	devices = None          # Flat list of devices in area.
-	
 	def __init__(self, parent, name):
 		assert isinstance(parent, StargateArea)
 		assert isinstance(name, str) or isinstance(name, unicode)
 		self.parent = parent
 		self.house = parent.house
-		self.name = name
-		self.devices = []
+		self.name = name			# String, human-readable name
+		self.devices = []			# Flat list of devices in area.
 		self.areas = []
 		# register with parent, which also registers with the house (which maintains a house-global lookup table on the unique/stable/int id it gets from the db)
 		self.area_id = parent.register_area(self)
@@ -225,25 +223,17 @@ class StargateArea(object):
 
 
 class StargateHouse(StargateArea):
-	persist = None                  # SgPersistence instance
-	events = None                   # SgEvents instance
-	gateways_by_name = None         # Map from gateway name to gateway object
-	areas_by_name = None            # Map from area name to area object
-	devices_by_id = None            # Map from device id to device object
-	areas_by_id = None              # Map from area id to area object
-	devclass_order = StargateDeviceFilter.DEVICE_CLASSES # List of devclass values, in sort order
-	devtype_order_by_devclass = {}  # Map from devclass to list of devtype values, in sort order
-	devstate_order_by_tc = {}       # Map from devclass:devtype to list of devstate values, in sort order
-
 	def __init__(self, config):
 		# ordering is very important here!
 		# need to be mostly complete before calling StargateArea initializer
-		self.house = self
-		self.persist = persistence.SgPersistence(config.database)
-		self.events = events.SgEvents(self.persist)
-		self.areas_by_name = {}
-		self.devices_by_id = {}
-		self.areas_by_id = {}
+		self.house = self											# SgHouse instance as SgArea member (we call super.__init__ later, below)
+		self.persist = persistence.SgPersistence(config.database)	# SgPersistence instance
+		self.events = events.SgEvents(self.persist)					# SgEvents instance
+		self.areas_by_name = {}										# Map from area name to area object
+		self.devices_by_id = {}										# Map from device id to device object
+		self.areas_by_id = {}										# Map from area id to area object
+		self.devtype_order_by_devclass = {}  						# Map from devclass to list of devtype values, in sort order
+		self.devstate_order_by_tc = {}       						# Map from devclass:devtype to list of devstate values, in sort order
 		super(StargateHouse, self).__init__(self, config.house.name)
 		# finish initalization of all my fields before calling gateway loader
 		# ...
@@ -339,7 +329,7 @@ class StargateHouse(StargateArea):
 		if devclass and devclass != 'device':
 			classes = [devclass]
 		else:
-			classes = self.devclass_order
+			classes = StargateDeviceFilter.DEVICE_CLASSES
 		# iterate devclass list to build list of devtypes
 		tcs = []
 		for dc in classes:
@@ -359,7 +349,7 @@ class StargateHouse(StargateArea):
 		if devclass and devclass != 'device':
 			classes = [devclass]
 		else:
-			classes = self.devclass_order
+			classes = StargateDeviceFilter.DEVICE_CLASSES
 		# iterate devclass list to build list of devtypes
 		order = []
 		for devclass in classes:
@@ -371,14 +361,12 @@ class StargateHouse(StargateArea):
 
 class StargateGateway(object):
 	# gateways should subclass this
-	house = None         # StargateHouse instance
-	gateway_id = None    # String, database key (must be unique)
-	
 	def __init__(self, house, gateway_id):
 		assert isinstance(house, StargateHouse)
 		assert isinstance(gateway_id, str) or isinstance(gateway_id, unicode)
-		self.house = house
-		self.gateway_id = gateway_id
-		
-	# must have:
-	# get_device_by_gateway_id(gateway_devid)
+		self.house = house					# StargateHouse instance
+		self.gateway_id = gateway_id		# String, database key (must be unique)
+
+		# Subclass must have:
+		# get_device_by_gateway_id(gateway_devid)
+		assert callable(self.get_device_by_gateway_id)
