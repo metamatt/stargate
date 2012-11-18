@@ -225,6 +225,11 @@ class RepeaterKeypadDevice(KeypadDevice):
 	devtype = 'repeater'
 
 
+class MotionSensorDevice(ControlDevice):
+	devtype = 'occ-sensor'
+	possible_states = ('vacant', 'occupied')
+
+
 def create_device_for_output(ra_area, output_spec):
 	# Static factory for correct OutputDevice subclass matching Lutron OutputType.
 	map_lutron_output_to_class = {
@@ -253,6 +258,7 @@ def create_device_for_control(ra_area, device_spec):
 		"PICO_KEYPAD": RemoteKeypadDevice,
 		"VISOR_CONTROL_RECEIVER": RepeaterKeypadDevice,
 		"MAIN_REPEATER": RepeaterKeypadDevice,
+		"MOTION_SENSOR": MotionSensorDevice,
 	}
 
 	try:
