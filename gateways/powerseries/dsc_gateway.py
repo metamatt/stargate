@@ -40,7 +40,7 @@ class DscPartition(sg_house.StargateDevice):
 
 	def __init__(self, gateway, partition_num, name):
 		area = gateway.house # XXX for now
-		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition%d' % partition_num, name)
+		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition:%d' % partition_num, name)
 
 	# as a control: this should be able to arm/disarm (read and write)
 
@@ -51,7 +51,7 @@ class DscZoneSensor(sg_house.StargateDevice):
 	possible_states = ( 'closed', 'open' )
 
 	def __init__(self, gateway, area, zone_number, name):
-		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone%d' % zone_number, name)
+		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone:%d' % zone_number, name)
 		self.open_state = None
 		self.zone_number = zone_number
 
@@ -111,14 +111,33 @@ class DscGateway(sg_house.StargateGateway):
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
-		# XXX this is uncalled; we need to distinguish between devtypes (zone, partition, etc)
-		assert isinstance(gateway_devid, int)
-		zone_id = int(gateway_devid)
-		return self.zones_by_id[zone_id]
+		# our devid format is "scope,num" where scope is one of: [ zone, partition, command ].
+		(scope, num) = self.crack_dsc_devid(gateway_devid)
+		if scope == 'zone':
+			return self.zones_by_id[num]
+		elif scope == 'partition':
+			return self.partitions_by_id[num]
+		else:
+			raise Error('whoops')
+
+	def crack_dsc_devid(self, gateway_devid):
+		cracked = gateway_devid.split(':')
+		assert len(cracked) == 2
+		assert int(cracked[1]) > 0
+		return (cracked[0], int(cracked[1]))
 		
 	# child-device interface for device status
 	def get_zone_status(self, zone_num):
 		return self.panel_server.cache.get_zone_status(zone_num)
+
+	def send_user_command(self, partition_num, user_cmd_num):
+		# Envisalink UI calls this "PGM", but it's really the user-command which you often map PGM outputs to listen to, but it's not actually that direct.
+		# partition_num is 1..8
+		# user_cmd_num is 1..4
+		command = 20 # 020 in DSC-speak, but Python interprets that as octal, which is not what we want
+		data = [ str(user_cmd_num), str(partition_num) ]
+		assert len(data) == 2
+		self.panel_server.send_dsc_command(command, data)
 
 	# panel action callback
 	def on_user_action(self, zone_id, state, refresh):

@@ -238,13 +238,14 @@ class StargateHouse(StargateArea):
 		# finish initalization of all my fields before calling gateway loader
 		# ...
 		# gateway loader will cause a lot of stuff to happen
-		self.gateways = gateways.load_all(self, config.gateways)
+		# including overwriting our self.gateways
+		gateways.load_all(self, config.gateways)
 		if not len(self.gateways):
 			raise Exception("No gateways were loaded")
 	
 	def get_device_by_gateway_and_id(self, gateway_id, gateway_device_id):
 		gateway = self.gateways[gateway_id]
-		return gateway.get_device_by_id(gateway_device_id)
+		return gateway.get_device_by_gateway_id(gateway_device_id)
 	
 	def get_area_by_name(self, area_name):
 		# XXX currently creates all areas as direct children of the root area; no facility for deeper nesting

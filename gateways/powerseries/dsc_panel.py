@@ -122,7 +122,7 @@ class DscPanelServer(object):
 		# Can be called on any stargate thread; will send data over network socket to DSC system
 		cmdline = self._encode_dsc_command(command, data_bytes)
 		self._send_dsc_cmdline(cmdline)
-	
+
 	# private helpers for command send/receive
 	def _send_dsc_cmdline(self, cmdline):
 		# Send over network to panel.

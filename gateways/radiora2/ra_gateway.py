@@ -73,8 +73,8 @@ class SwitchedOutput(OutputDevice):
 	def is_on(self):
 		return self.get_level() > 0
 
-	def be_on(self):
-		self.set_level(100)
+	def be_on(self, on = True):
+		self.set_level(100 if on else 0)
 
 	def is_off(self):
 		return self.get_level() == 0

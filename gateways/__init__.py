@@ -10,9 +10,18 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 def load_all(sg_house, gateways_config):
-	gateway_map = {}
+	sg_house.gateways = {}
+	gateway_map = sg_house.gateways
 
-	for gateway_module_name in gateways_config.keys():
+	# XXX quick and dirty hack to allow config file to set order; I should really figure out how
+	# to preserve order of YAML file and just process it in order. What we've been doing is importing
+	# the whole YAML config into a python dict, then just enumerating dict keys in arbitrary order.
+	# What we'll do for now is look for an "order" key in the YAML file at the same level as the
+	# gateway configs; if that exists, use it as the order to process the real gateways; otherwise
+	# just fall back on the keys at this level (which is what we've been doing until now).
+	gateway_order = gateways_config.order or gateways_config.keys()
+
+	for gateway_module_name in gateway_order:
 		# Load gateway plugin code
 		# gateway plugins are likely actually a package, not a module, but importlib calls it import_module, so...
 		gateway_module = importlib.import_module('.' + gateway_module_name, __name__)

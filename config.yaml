@@ -46,6 +46,8 @@ house:
 # gateway plugin module configuration
 # one section for each gateway plugin to load, by name
 gateways:
+    order: [ radiora2, powerseries, vera, synther] # This is an ugly hack
+
     radiora2:
         # disabled: true # optional, default false, uncomment to disable while testing
         repeater:
@@ -72,18 +74,31 @@ gateways:
         zone_names:
             1: Garage door
             2: Garage side door
-            5: Alley door
-            6: Storage room door
+            3: Alley door
+            4: Storage room door
+            6: Alley lights
+            7: Lower stair lights
+            8: Upper stair lights
             9: Media room back door
+            16: Media room motion
             17: Front door
             18: Kitchen back door
+            24: Hallway motion
         partition_names:
             1: Burglar alarm
             2: Lighting integration
             3: Lock integration
         area_mapping:
             Garage: [ 1, 2 ]
-            Outside: [ 5, 6 ]
+            Outside: [ 3, 4, 6, 7, 8 ]
             Entryway: [ 17 ]
             Kitchen: [ 18 ]
-            Media room: [ 9 ]
+            Media room: [ 9, 16 ]
+            Hallway: [ 24 ]
+
+    synther:
+        # disabled: true # optional, default false, uncomment to disable while testing
+        bridges:
+            - { radiora2: 96, dsc_zone: 6, dsc_cmd: 23 } # alley
+            - { radiora2: 93, dsc_zone: 7, dsc_cmd: 22 } # lower
+            - { radiora2: 95, dsc_zone: 8, dsc_cmd: 21 } # upper
