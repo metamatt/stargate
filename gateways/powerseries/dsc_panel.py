@@ -23,10 +23,10 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class DscPanelCache(object):
-	def __init__(self, panel_server):
+	def __init__(self, panel_server, event_sink):
 		self.zone_status = {}
 		self.partition_status = {}
-		self.subscribers = []
+		self.event_sink = event_sink
 		self.panel_server = panel_server
 		for i in range(1, 65):
 			self.zone_status[i] = 'stale'
@@ -56,9 +56,9 @@ class DscPanelCache(object):
 
 	def _broadcast_change(self, dev_id, state):
 		refresh = False # XXX
+		# XXX we're not distinguishing between event sources (zone, partition, command-output), and definitely need to.
 		logger.debug('broadcast_change: sending on_user_action(dev_id=%s, refresh=%s)' % (dev_id, str(refresh)))
-		for subscriber in self.subscribers:
-			subscriber.on_user_action(dev_id, state, refresh)
+		self.event_sink.on_user_action(dev_id, state, refresh)
 
 
 class CrlfSocketBuffer(object):
@@ -100,7 +100,7 @@ class DscPanelServer(object):
 		self.port = port
 		self.password = password
 
-	def connect(self):
+	def connect(self, event_sink):
 		# Right now, this only knows how to connect over a TCP socket
 		# and authenticate using Envisalink's protocol, so it basically
 		# assumes Envisalink. Without too many changes, we could probably
@@ -116,7 +116,7 @@ class DscPanelServer(object):
 		# log in
 		self.send_dsc_command(005, self.password)
 		# cache creation will issue the global-status command triggering many responses
-		self.cache = DscPanelCache(self)
+		self.cache = DscPanelCache(self, event_sink)
 
 	def send_dsc_command(self, command, data_bytes = []):
 		# Can be called on any stargate thread; will send data over network socket to DSC system

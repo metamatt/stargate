@@ -67,6 +67,15 @@ class DscZoneSensor(sg_house.StargateDevice):
 	def is_closed(self):
 		return not self.is_open()
 
+	def on_user_action(self, level, synthetic):
+		self.event_persist_level = level # XXX need better name. Just bool state (open/closed)
+		self.house.events.on_device_state_change(self, synthetic) # state
+
+	# XXX these as well need better names
+	def get_event_persist_state(self):
+		return self.event_persist_level
+	# don't override get_event_persist_details (which base class should implement as returning None)
+
 
 class DscGateway(sg_house.StargateGateway):
 	def __init__(self, house, gateway_instance_name, config):
@@ -98,7 +107,7 @@ class DscGateway(sg_house.StargateGateway):
 			self.reflector = None
 
 		# and start everything in motion
-		self.panel_server.connect()
+		self.panel_server.connect(self)
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
@@ -110,3 +119,10 @@ class DscGateway(sg_house.StargateGateway):
 	# child-device interface for device status
 	def get_zone_status(self, zone_num):
 		return self.panel_server.cache.get_zone_status(zone_num)
+
+	# panel action callback
+	def on_user_action(self, zone_id, state, refresh):
+		logger.debug('panel action zone %d' % zone_id)
+		if self.zones_by_id.has_key(zone_id):
+			device = self.zones_by_id[zone_id] # XXX should handle other event sources: partition, command-output
+			device.on_user_action(state, refresh)
