@@ -135,7 +135,7 @@ class DscGateway(sg_house.StargateGateway):
 		# partition_num is 1..8
 		# user_cmd_num is 1..4
 		command = 20 # 020 in DSC-speak, but Python interprets that as octal, which is not what we want
-		data = [ str(user_cmd_num), str(partition_num) ]
+		data = [ str(partition_num), str(user_cmd_num) ]
 		assert len(data) == 2
 		self.panel_server.send_dsc_command(command, data)
 
