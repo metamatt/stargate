@@ -79,7 +79,7 @@ class ListenerThread(threading.Thread):
 		super(ListenerThread, self).__init__(name = 'dsc_listener')
 		self.daemon = True
 		self.logger = logging.getLogger(__name__ + '.listener')
-		self.logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
+		self.logger.info('%s: init with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
 		self.gateway = gateway
 		self.socket = gateway.socket
 		

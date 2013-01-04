@@ -40,7 +40,7 @@ if __name__ == '__main__':
 	logger = logging.getLogger()
 	global_loglevel = str_to_loglevel(config.logging.level)
 	logger.setLevel(global_loglevel)
-	log_formatter = logging.Formatter('%(asctime)s %(threadName)-12s %(levelname)-8s: %(message)s')
+	log_formatter = logging.Formatter('%(asctime)s %(threadName)-12s %(levelname)-8s: %(name)s: %(message)s')
 	# log to file
 	logfile_formatstr = config.logging.logfile
 	logfile_params = { 'pid': os.getpid() }
