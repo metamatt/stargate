@@ -21,7 +21,6 @@ class Bridge(object):
 	def __init__(self, synthesizer, params):
 		logger.info('create bridge for %s' % str(params))
 		self.synth = synthesizer
-		self.ignore_time = 0
 		house = synthesizer.house
 		keys = params.keys()
 
@@ -36,17 +35,13 @@ class Bridge(object):
 		ra_dev.be_on(dsc_zone.is_open())
 
 		# Watch when Lutron says to change it (Lutron button/remote/integration)
-		# XXX need to ignore these at startup for a while (say 10 seconds), because Lutron repeater
-		# is sending ~20 spurious status-changed messages
-		self.ignore_until(10)
 		def on_lutron_push(synthetic):
-			if not self.is_ignoring():
-				logger.debug('lutron dev %d changed to %s %s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
-				if ra_dev.is_on() != dsc_zone.is_open():
-					logger.debug('telling dsc to toggle 020%d%d' % (dsc_partition, dsc_cmd_id))
-					dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
+			logger.debug('lutron dev %d changed to %s %s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
+			if ra_dev.is_on() != dsc_zone.is_open():
+				logger.debug('telling dsc to toggle 020%d%d' % (dsc_partition, dsc_cmd_id))
+				dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
 			else:
-				logger.debug('ignoring lutron dev-change for %d to %s during cooldown period' % (ra_dev.iid, ra_dev.is_on()))
+				logger.debug('ignoring lutron dev-change for %d to already-current state %s' % (ra_dev.iid, ra_dev.is_on()))
 		house.events.subscribe(ra_dev, on_lutron_push)
 
 		# Watch when DSC says it did change (someone used an old-school switch)
@@ -54,12 +49,6 @@ class Bridge(object):
 			logger.debug('dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
 			ra_dev.be_on(dsc_zone.is_open())
 		house.events.subscribe(dsc_zone, on_physical_push)
-
-	def ignore_until(self, delay):
-		self.ignore_time = max([ self.ignore_time, time.time() + delay ])
-
-	def is_ignoring(self):
-		return time.time() <= self.ignore_time
 
 
 class Synthesizer(sg_house.StargateGateway):
