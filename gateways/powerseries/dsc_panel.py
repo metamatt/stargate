@@ -13,9 +13,11 @@
 # - clean up/flesh out cache; settle on way of doing device ids across zone/partition/other
 
 import logging
+import Queue
 import select
 import socket
 import threading
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -75,13 +77,13 @@ class CrlfSocketBuffer(object):
 
 
 class ListenerThread(threading.Thread):
-	def __init__(self, gateway):
+	def __init__(self, panel_server):
 		super(ListenerThread, self).__init__(name = 'dsc_listener')
 		self.daemon = True
 		self.logger = logging.getLogger(__name__ + '.listener')
 		self.logger.info('%s: init with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
-		self.gateway = gateway
-		self.socket = gateway.socket
+		self.panel_server = panel_server
+		self.socket = panel_server.socket
 		
 	def run(self):
 		buffer = CrlfSocketBuffer(self.socket)
@@ -90,7 +92,22 @@ class ListenerThread(threading.Thread):
 			(readable, writable, errored) = select.select([self.socket], [], [self.socket])
 			self.logger.debug('wake for input')
 			for line in buffer.read_lines():
-				self.gateway._receive_dsc_cmd(line)
+				self.panel_server._receive_dsc_cmd(line)
+
+
+class SenderThread(threading.Thread):
+	def __init__(self, panel_server):
+		super(SenderThread, self).__init__(name = 'dsc_sender')
+		self.daemon = True
+		self.panel_server = panel_server
+		self.socket = panel_server.socket
+
+	def run(self):
+		while True:
+			cmdline = self.panel_server.send_queue.get()
+			logger.debug('debug: dequeue and send command: ' + str(cmdline))
+			self.socket.send(str(cmdline) + '\r\n')
+			time.sleep(0.5) # XXX ugly hack
 
 
 class DscPanelServer(object):
@@ -107,12 +124,14 @@ class DscPanelServer(object):
 		# talk to a TCP->serial gateway to an IT-100, and without too many
 		# more changes, could talk to a serial port connected to an IT-100
 		# if one exists. For now, just use weakly-authenticated-TCP.
-		self.sender_lock = threading.RLock()
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.connect((self.hostname, self.port))
 		self.socket.setblocking(0)
 		self.listen_thread = ListenerThread(self)
 		self.listen_thread.start()
+		self.send_queue = Queue.Queue()
+		self.send_thread = SenderThread(self)
+		self.send_thread.start()
 		# log in
 		self.send_dsc_command(005, self.password)
 		# cache creation will issue the global-status command triggering many responses
@@ -126,9 +145,12 @@ class DscPanelServer(object):
 	# private helpers for command send/receive
 	def _send_dsc_cmdline(self, cmdline):
 		# Send over network to panel.
-		with self.sender_lock:
-			logger.debug('debug: send command: ' + str(cmdline))
-			self.socket.send(str(cmdline) + '\r\n')
+		# XXX serializing requests with a lock is not enough; we need to enforce some delay between,
+		# because the panel can't handle us bombarding it with requests too quickly. Ideally we would
+		# tag cmds with partition id and only send cmds to ready partitions; for now we'll just send
+		# them to a worker thread that won't dequeue them too quickly.
+		logger.debug('debug: enqueue command: ' + str(cmdline))
+		self.send_queue.put(str(cmdline))
 
 	def _receive_dsc_cmd(self, cmdline):
 		# Called on listener thread when panel says something.
