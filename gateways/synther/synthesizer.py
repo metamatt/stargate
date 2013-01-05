@@ -29,7 +29,7 @@ class Bridge(object):
 		# XXX right now, behavior is hardcoded to handle radiora2<>powerseries the way I'm using them
 		ra_dev = house.get_device_by_gateway_and_id('radiora2', params['radiora2'])
 		dsc_zone = house.get_device_by_gateway_and_id('powerseries', 'zone:%d' % params['dsc_zone'])
-		(dsc_partition, dsc_cmd_id) = str(params['dsc_cmd'])
+		(dsc_partition, dsc_cmd_id) = map(int, str(params['dsc_cmd']))
 
 		# Suck initial state from DSC and push into Lutron
 		logger.debug('Currently: Lutron says %s; DSC says %s' % (ra_dev.is_on(), dsc_zone.is_open()))
@@ -43,7 +43,7 @@ class Bridge(object):
 			if not self.is_ignoring():
 				logger.debug('lutron dev %d changed to %s %s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
 				if ra_dev.is_on() != dsc_zone.is_open():
-					logger.debug('telling dsc to toggle 020%s%s' % (dsc_partition, dsc_cmd_id))
+					logger.debug('telling dsc to toggle 020%d%d' % (dsc_partition, dsc_cmd_id))
 					dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
 			else:
 				logger.debug('ignoring lutron dev-change for %d to %s during cooldown period' % (ra_dev.iid, ra_dev.is_on()))
