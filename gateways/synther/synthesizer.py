@@ -19,7 +19,7 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 class Bridge(object):
 	def __init__(self, synthesizer, params):
-		print 'create bridge for', params
+		logger.info('create bridge for %s' % str(params))
 		self.synth = synthesizer
 		self.ignore_time = 0
 		house = synthesizer.house
@@ -32,7 +32,7 @@ class Bridge(object):
 		(dsc_partition, dsc_cmd_id) = str(params['dsc_cmd'])
 
 		# Suck initial state from DSC and push into Lutron
-		print 'Currently: Lutron says', ra_dev.is_on(), 'DSC says', dsc_zone.is_open()
+		logger.debug('Currently: Lutron says %s; DSC says %s' % (ra_dev.is_on(), dsc_zone.is_open()))
 		ra_dev.be_on(dsc_zone.is_open())
 
 		# Watch when Lutron says to change it (Lutron button/remote/integration)
@@ -41,17 +41,17 @@ class Bridge(object):
 		self.ignore_until(10)
 		def on_lutron_push(synthetic):
 			if not self.is_ignoring():
-				print 'lutron dev', ra_dev.iid, 'changed to', ra_dev.is_on(), 'synthetic', synthetic
+				logger.debug('lutron dev %d changed to %s %s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
 				if ra_dev.is_on() != dsc_zone.is_open():
-					print 'telling dsc to toggle 020', dsc_partition, dsc_cmd_id
+					logger.debug('telling dsc to toggle 020%s%s' % (dsc_partition, dsc_cmd_id))
 					dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
 			else:
-				print 'ignoring lutron dev-change for', ra_dev.iid, 'to', ra_dev.is_on(), 'during cooldown period'
+				logger.debug('ignoring lutron dev-change for %d to %s during cooldown period' % (ra_dev.iid, ra_dev.is_on()))
 		house.events.subscribe(ra_dev, on_lutron_push)
 
 		# Watch when DSC says it did change (someone used an old-school switch)
 		def on_physical_push(synthetic):
-			print 'dsc dev', dsc_zone.zone_number, 'changed to', dsc_zone.is_open()
+			logger.debug('dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
 			ra_dev.be_on(dsc_zone.is_open())
 		house.events.subscribe(dsc_zone, on_physical_push)
 
