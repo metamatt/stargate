@@ -42,19 +42,16 @@ class Bridge(object):
 		def on_lutron_push(synthetic):
 			if not self.is_ignoring():
 				print 'lutron dev', ra_dev.iid, 'changed to', ra_dev.is_on(), 'synthetic', synthetic
-				print 'telling dsc to toggle 020', dsc_partition, dsc_cmd_id
-				dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
+				if ra_dev.is_on() != dsc_zone.is_open():
+					print 'telling dsc to toggle 020', dsc_partition, dsc_cmd_id
+					dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
 			else:
-				print 'ignoring lutron dev-change for', ra_dev.iid, 'during cooldown period'
+				print 'ignoring lutron dev-change for', ra_dev.iid, 'to', ra_dev.is_on(), 'during cooldown period'
 		house.events.subscribe(ra_dev, on_lutron_push)
 
 		# Watch when DSC says it did change (someone used an old-school switch)
 		def on_physical_push(synthetic):
 			print 'dsc dev', dsc_zone.zone_number, 'changed to', dsc_zone.is_open()
-			# XXX also quiesce Lutron writes for a brief period, because we want to change the current
-			# Lutron state without having that state change trigger another one in on_lutron_push.
-			# Maybe not the best way of handling this.
-			self.ignore_until(2)
 			ra_dev.be_on(dsc_zone.is_open())
 		house.events.subscribe(dsc_zone, on_physical_push)
 
