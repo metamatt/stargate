@@ -21,6 +21,7 @@ class Bridge(object):
 	def __init__(self, synthesizer, params):
 		print 'create bridge for', params
 		self.synth = synthesizer
+		self.ignore_time = 0
 		house = synthesizer.house
 		keys = params.keys()
 
@@ -37,9 +38,9 @@ class Bridge(object):
 		# Watch when Lutron says to change it (Lutron button/remote/integration)
 		# XXX need to ignore these at startup for a while (say 10 seconds), because Lutron repeater
 		# is sending ~20 spurious status-changed messages
-		ignore_time = time.time() + 10
+		self.ignore_until(10)
 		def on_lutron_push(synthetic):
-			if time.time() > ignore_time:
+			if not self.is_ignoring():
 				print 'lutron dev', ra_dev.iid, 'changed to', ra_dev.is_on(), 'synthetic', synthetic
 				print 'telling dsc to toggle 020', dsc_partition, dsc_cmd_id
 				dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
@@ -50,8 +51,18 @@ class Bridge(object):
 		# Watch when DSC says it did change (someone used an old-school switch)
 		def on_physical_push(synthetic):
 			print 'dsc dev', dsc_zone.zone_number, 'changed to', dsc_zone.is_open()
+			# XXX also quiesce Lutron writes for a brief period, because we want to change the current
+			# Lutron state without having that state change trigger another one in on_lutron_push.
+			# Maybe not the best way of handling this.
+			self.ignore_until(2)
 			ra_dev.be_on(dsc_zone.is_open())
 		house.events.subscribe(dsc_zone, on_physical_push)
+
+	def ignore_until(self, delay):
+		self.ignore_time = max([ self.ignore_time, time.time() + delay ])
+
+	def is_ignoring(self):
+		return time.time() <= self.ignore_time
 
 
 class Synthesizer(sg_house.StargateGateway):
