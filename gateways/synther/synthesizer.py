@@ -22,10 +22,9 @@ class Bridge(object):
 		logger.info('create bridge for %s' % str(params))
 		self.synth = synthesizer
 		house = synthesizer.house
-		keys = params.keys()
 
 		# Locate devices to operate on
-		# XXX right now, behavior is hardcoded to handle radiora2<>powerseries the way I'm using them
+		# XXX for now, behavior is hardcoded to handle radiora2<>powerseries the way I'm using them
 		ra_dev = house.get_device_by_gateway_and_id('radiora2', params['radiora2'])
 		dsc_zone = house.get_device_by_gateway_and_id('powerseries', 'zone:%d' % params['dsc_zone'])
 		(dsc_partition, dsc_cmd_id) = map(int, str(params['dsc_cmd'])) # split out the digits
@@ -46,17 +45,95 @@ class Bridge(object):
 
 		# Watch when DSC says it did change (someone used an old-school switch)
 		def on_physical_push(synthetic):
-			logger.debug('dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
+			logger.debug('synther.bridge: dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
 			ra_dev.be_on(dsc_zone.is_open())
 		house.events.subscribe(dsc_zone, on_physical_push)
 
 
+class LedBridge(object):
+	def __init__(self, synthesizer, params):
+		logger.info('create ledbridge for %s' % str(params))
+		self.synth = synthesizer
+		house = synthesizer.house
+
+		# Locate devices to operate on
+		# XXX for now, behavior is hardcoded to handle powerseries zone -> radiora2 keypad button led
+		ra_keypad = house.get_device_by_gateway_and_id('radiora2', params['radiora2_keypad'])
+		ra_button = ra_keypad.get_button(params['radiora2_button_cid'])
+		dsc_zone = house.get_device_by_gateway_and_id('powerseries', 'zone:%d' % params['dsc_zone'])
+		negate = params['negate']
+		if negate:
+			map_state = lambda state: not state
+		else:
+			map_state = lambda state: state
+
+		# Watch when DSC says it changed
+		def on_change(synthetic):
+			logger.debug('synther.ledbridge: dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
+			ra_button.set_led_state(map_state(dsc_zone.is_open()))
+		house.events.subscribe(dsc_zone, on_change)
+		# Call once now to suck initial state from DSC and push into Lutron
+		on_change(True)
+
+
+class Delay(object):
+	def __init__(self, synthesizer, params):
+		logger.info('create delay-reaction for %s' % str(params))
+		self.synth = synthesizer
+		house = synthesizer.house
+
+		# Locate device to operate on
+		# XXX for now, behavior is hardcoded to handle radiora2 keypad -> radiora2 device
+		ra_keypad = house.get_device_by_gateway_and_id('radiora2', params['radiora2_keypad'])
+		ra_button = ra_keypad.get_button(params['radiora2_button_cid'])
+		ra_output = house.get_device_by_gateway_and_id('radiora2', params['radiora2_output'])
+		delay = params['delay']
+		value = params['value']
+
+		# Watch when Lutron says button state changed
+		class NonlocalState(object): # to supply writable state in nonlocal scope for nested functions to follow
+			def __init__(self, pressed):
+				self.pressed = pressed
+				self.timer_token = None
+		state = NonlocalState(ra_button.get_button_state())
+		def on_delay():
+			logger.debug('synther.delay: delay elapsed; set dev %d to %s' % (ra_keypad.iid, value))
+			if value == 'pulse':
+				ra_output.pulse_output()
+			else:
+				ra_output.set_level(int(value))
+			state.timer_token = None
+		def on_lutron_push(synthetic):
+			# Button state changed; response depends on old and new states
+			pressed = ra_button.get_button_state()
+			# If newly pressed: install timer callback
+			if pressed and not state.pressed:
+				if state.timer_token == None:
+					state.timer_token = house.timer.add_event(delay, on_delay)
+			# If released with timer callback pending: cancel timer callback
+			if state.pressed and not pressed:
+				if state.timer_token != None:
+					house.timer.cancel_event(state.timer_token)
+					state.timer_token = None
+			state.pressed = pressed
+			# If timer callback elapses while still pressed: take action
+		house.events.subscribe(ra_keypad, on_lutron_push)
+
+
 class Synthesizer(sg_house.StargateGateway):
-	def __init__(self, house, gateway_instance_name, bridges):
+	def __init__(self, house, gateway_instance_name, bridges, ledbridges, delays):
 		super(Synthesizer, self).__init__(house, gateway_instance_name)
 		self.bridges = []
 		for bridge in bridges:
 			self.bridges.append(Bridge(self, bridge))
+
+		self.ledbridges = []
+		for ledbridge in ledbridges:
+			self.ledbridges.append(LedBridge(self, ledbridge))
+
+		self.delays = []
+		for delay in delays:
+			self.delays.append(Delay(self, delay))
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):

@@ -4,7 +4,6 @@
 #
 # This module provides the message bus for event notifications.
 
-
 import logging
 
 

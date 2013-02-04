@@ -46,7 +46,20 @@ house:
 # gateway plugin module configuration
 # one section for each gateway plugin to load, by name
 gateways:
-    order: [ radiora2, powerseries, vera, synther] # This is an ugly hack
+    # This is an ugly hack; I should read yaml file into order-preserving dictionary
+    order: [ radiora2, powerseries, vera, synther]
+
+    # Gateway list: configure each desired gateway module.
+    #
+    # Instead of just mentioning a gateway name as scope here, I should have these be user-defined
+    # names which specify a gateway inside, and allow the same gateway to be loaded more than once.
+    # Then in gateways which refer to devices belonging to other gateways (e.g. synther), we should
+    # have a uniform syntax for referring to (gateway, device, params).
+    #
+    # Something like:
+    # my_radiora:
+    #   type = radiora2
+    #   ... other args for radiora2 ...
 
     radiora2:
         # disabled: true # optional, default false, uncomment to disable while testing
@@ -98,7 +111,23 @@ gateways:
 
     synther:
         # disabled: true # optional, default false, uncomment to disable while testing
+        # This should get generalized and cleaned up. For now, it only supports the devices pairs I need right now.
+
+        # bridges: a radiora2 output which is programmed but not activated from Lutron programming perspective;
+        # it will get its state from dsc_zone sensor and send toggle to dsc_cmd output XY (partition X command Y)
+        # if it changes state.
         bridges:
             - { radiora2: 96, dsc_zone: 6, dsc_cmd: 23 } # alley
             - { radiora2: 93, dsc_zone: 7, dsc_cmd: 22 } # lower
             - { radiora2: 95, dsc_zone: 8, dsc_cmd: 21 } # upper
+
+        # ledbridges: a radiora2 keypad button LED which should not be assigned to anything in Lutron software.
+        # It will get its state from dsc_zone sensor. Note that we use the button ID, not the LED it, as the
+        # component ID, because RaRepeater stores buttons and LEDs together by button ID.
+        ledbridges:
+            - { radiora2_keypad: 21, radiora2_button_cid: 5, dsc_zone: 1, negate: false }
+
+        # delays: a radiora2 keypad button which will send a command to another radiora2 device if pressed and
+        # held until the delay expires.
+        delays:
+            - { radiora2_keypad: 21, radiora2_button_cid: 5, delay: 3, radiora2_output: 55, value: pulse }
