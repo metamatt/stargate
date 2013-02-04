@@ -7,6 +7,7 @@
 import logging
 import threading
 import time
+import traceback
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class SgTimer(object):
 			else:
 				delay = event.when - time.clock()
 				if (delay < 0):
-					logger.warning('detected expired event in queue')
+					logger.warning('detected expired event in queue: when=%g now=%g' % (event.when, time.clock()))
 					delay = 0
 		return delay
 
@@ -96,7 +97,8 @@ class SgTimer(object):
 			try:
 				handler()
 			except:
-				logger('exception in timer handler')
+				logger.error('exception in timer event handler')
+				logger.error(traceback.format_exc())
 
 
 if __name__ == '__main__':
