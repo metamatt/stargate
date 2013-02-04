@@ -149,6 +149,9 @@ class ContactClosureOutput(OutputDevice):
 	def get_name_for_level(self, level):
 		return 'active' if level > 0 else 'inactive'
 
+	def pulse_output(self):
+		self.gateway._pulse_output(self.iid)
+
 
 class ControlDevice(LutronDevice):
 	# Common device subclass for controls (keypads, remotes, repeater/receiver buttons).
@@ -346,6 +349,9 @@ class RaGateway(sg_house.StargateGateway):
 	
 	def _set_output_level(self, iid, level):
 		return self.repeater.set_output_level(iid, level)
+	
+	def _pulse_output(self, iid):
+		return self.repeater.pulse_output(iid)
 	
 	def _get_button_state(self, iid, bid):
 		return self.repeater.get_button_state(iid, bid)

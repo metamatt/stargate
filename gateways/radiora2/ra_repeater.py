@@ -172,6 +172,9 @@ class RaRepeater(object):
 	def set_output_level(self, output_iid, level):
 		self.send_repeater_command('#OUTPUT,%d,1,%g' % (output_iid, level))
 
+	def pulse_output(self, output_iid):
+		self.send_repeater_command('#OUTPUT,%d,6' % (output_iid))
+
 	def get_button_state(self, device_iid, button_cid):
 		return self.cache.get_button_state(device_iid, button_cid)
 
