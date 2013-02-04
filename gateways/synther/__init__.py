@@ -7,4 +7,4 @@ import synthesizer
 def init(house, instance_name, gateway_config):
 	return synthesizer.Synthesizer(house, instance_name,
 		gateway_config.bridges, gateway_config.ledbridges,
-		gateway_config.delays)
+		gateway_config.delays, gateway_config.paranoid)

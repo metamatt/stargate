@@ -30,6 +30,11 @@ logging:
     level.gateways.powerseries: debug
     level.gateways.powerseries.dsc_panel.listener: info
 
+# notifications
+notifications:
+    smtp_host: smtp.comcast.net
+    smtp_sender: matt@ginzton.net
+
 # webserver configuration (for UI and API)
 server:
     port: 5000
@@ -131,3 +136,12 @@ gateways:
         # held until the delay expires.
         delays:
             - { radiora2_keypad: 21, radiora2_button_cid: 5, delay: 3, radiora2_output: 55, value: pulse }
+
+        # paranoid: send alert email if a zone is open too long. Delay is in seconds.
+        paranoid:
+            - { dsc_zone: 1, delay: 1800, notify: matt@ginzton.net } # garage door: 1/2 hour
+            - { dsc_zone: 2, delay: 3600, notify: matt@ginzton.net } # side door: 1 hour
+            - { dsc_zone: 3, delay: 14400, notify: matt@ginzton.net } # alley: 4 hours
+            - { dsc_zone: 9, delay: 7200, notify: matt@ginzton.net } # back door: 2 hours
+            - { dsc_zone: 17, delay: 300, notify: matt@ginzton.net } # front door: 5 minutes
+            - { dsc_zone: 18, delay: 28800, notify: matt@ginzton.net } # back door: 8 hours

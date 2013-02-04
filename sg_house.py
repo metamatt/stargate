@@ -9,6 +9,7 @@ import logging
 
 import events
 import gateways
+import notify
 import persistence
 import timer
 
@@ -231,6 +232,7 @@ class StargateHouse(StargateArea):
 		self.persist = persistence.SgPersistence(config.database)	# SgPersistence instance
 		self.events = events.SgEvents(self.persist)					# SgEvents instance
 		self.timer = timer.SgTimer()                                # SgTimer instance
+		self.notify = notify.SgNotify(config.notifications)         # SgNotify instance
 		self.areas_by_name = {}										# Map from area name to area object
 		self.devices_by_id = {}										# Map from device id to device object
 		self.areas_by_id = {}										# Map from area id to area object

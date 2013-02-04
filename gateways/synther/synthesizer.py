@@ -108,11 +108,11 @@ class Delay(object):
 			pressed = ra_button.get_button_state()
 			# If newly pressed: install timer callback
 			if pressed and not state.pressed:
-				if state.timer_token == None:
+				if state.timer_token is None:
 					state.timer_token = house.timer.add_event(delay, on_delay)
 			# If released with timer callback pending: cancel timer callback
 			if state.pressed and not pressed:
-				if state.timer_token != None:
+				if state.timer_token is not None:
 					house.timer.cancel_event(state.timer_token)
 					state.timer_token = None
 			state.pressed = pressed
@@ -120,8 +120,44 @@ class Delay(object):
 		house.events.subscribe(ra_keypad, on_lutron_push)
 
 
+class Paranoid(object):
+	def __init__(self, synthesizer, params):
+		logger.info('create paranoid for %s' % str(params))
+		self.synth = synthesizer
+		house = synthesizer.house
+
+		# Locate devices to operate on
+		# XXX for now, behavior is hardcoded to handle powerseries zone -> email
+		dsc_zone = house.get_device_by_gateway_and_id('powerseries', 'zone:%d' % params['dsc_zone'])
+		delay = params['delay']
+		notify_addr = params['notify']
+
+		# Watch when DSC says it changed
+		class NonlocalState(object): # to supply writable state in nonlocal scope for nested functions to follow
+			def __init__(self):
+				self.timer_token = None
+		state = NonlocalState()
+		def on_delay():
+			logger.debug('synther.paranoid: delay elapsed; send mail to ' + notify_addr)
+			msg = ('Security zone "%s" has been open for %d seconds.\n\n' +
+			       'You will not be notified again until it closes and reopens.') % (dsc_zone.name, delay)
+			house.notify.email(notify_addr, msg, 'Stargate: door open warning')
+		def on_change(synthetic):
+			logger.debug('synther.paranoid: dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
+			if dsc_zone.is_open():
+				if state.timer_token is None:
+					state.timer_token = house.timer.add_event(delay, on_delay)
+			else:
+				if state.timer_token is not None:
+					house.timer.cancel_event(state.timer_token)
+					state.timer_token = None
+		house.events.subscribe(dsc_zone, on_change)
+		# Call once now so if it's open, we start counting
+		on_change(True)
+
+
 class Synthesizer(sg_house.StargateGateway):
-	def __init__(self, house, gateway_instance_name, bridges, ledbridges, delays):
+	def __init__(self, house, gateway_instance_name, bridges, ledbridges, delays, paranoids):
 		super(Synthesizer, self).__init__(house, gateway_instance_name)
 		self.bridges = []
 		for bridge in bridges:
@@ -134,6 +170,10 @@ class Synthesizer(sg_house.StargateGateway):
 		self.delays = []
 		for delay in delays:
 			self.delays.append(Delay(self, delay))
+
+		self.paranoids = []
+		for paranoid in paranoids:
+			self.paranoids.append(Paranoid(self, paranoid))
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
