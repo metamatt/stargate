@@ -34,6 +34,11 @@
 		<tr><td>Average level while {{ device.get_name_for_level(1) }}</td><td>TBD</td></tr>
 		<tr><td>Total time {{ device.get_name_for_level(0) }}</td><td>{{ device.get_time_in_state(False) | human_readable_timedelta }}</td></tr>
 	</table></ul>
+	<p>Recent events:<ul>
+		{% for ev in device.get_recent_events() %}
+			<li>{{ ev }}</li>
+		{% endfor %}
+	</ul></p>
 </font></p>
 
 {% endblock content %}

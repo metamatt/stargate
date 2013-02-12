@@ -144,14 +144,17 @@ class StargateDevice(object):
 	def get_delta_since_change(self):
 		return self.house.persist.get_delta_since_change(self.gateway.gateway_id, self.gateway_devid)
 		
-	def get_action_count(self, bucket = 1):
-		return self.house.persist.get_action_count(self.gateway.gateway_id, self.gateway_devid, bucket)
+	def get_action_count(self):
+		return self.house.persist.get_action_count(self.gateway.gateway_id, self.gateway_devid)
 		
 	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
 	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
 	# it's allowed to pass a level as the levelstate.
-	def get_time_in_state(self, levelstate, bucket = 1):
-		return self.house.persist.get_time_in_state(self.gateway.gateway_id, self.gateway_devid, levelstate, bucket)
+	def get_time_in_state(self, levelstate):
+		return self.house.persist.get_time_in_state(self.gateway.gateway_id, self.gateway_devid, levelstate)
+
+	def get_recent_events(self, count = 10):
+		return self.house.persist.get_recent_events(self.gateway.gateway_id, self.gateway_devid, count)
 
 
 class StargateArea(object):

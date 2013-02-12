@@ -11,21 +11,16 @@
 # _device_ _name_ is _state_ since _changetime_, _numchanges_ in _timebucket_, _interesting_state_ for _time_in_state_ ...
 #
 # Bugs/work items:
-# - last_tallied_ts may fit more naturally in the history bucket, not the device-status table?
 # - not tracking average level while on yet (and might need more parameters/persisted fields to do so)
-# - bucket rollover, not implemented yet
-# - week bucket doesn't fit the design well
-
-
-# A note on timekeeping: we want to know the last-changed time for each device, so we can say when it last changed and also
-# calculate how much time it's spent in each state. However, when we aren't running, we might miss events, and there's no way
-# to catch up with things we missed when we restart. So, we keep 2 timestamps: the last thing we saw (ever, including previous
-# runs) and the last thing we saw while continuously watching. Device-state-change notifications update both; when we restart
-# we update only the second one (so it follows that the current-run timestamp >= the any-run timestamp). Depending on the
-# purpose, we access one or the other: deltas of time-in-state are always based only on authoritative data (the current-run
-# timestamp); however device descriptions include a "last change we saw" field that is allowed to use previous-run data.
-# Another corollary: we track on_time and off_time, but these might not add up to the entire tracked time window; any
-# difference should be time we weren't running during which we can't say anything about the state.
+# - should cap the amount of data we store, and aggregate into less granular buckets
+#
+# A note on timekeeping: we write an event whenever a device changes state, and assuming we were running and watching
+# the whole time, we know what state that device was in for the entire interval between the previous and current events
+# for that device. However, if we crash or get killed or lose the connection to a device's gateway, we won't be able to
+# track it until we restart. To represent this, there are two additional event types: "checkpoint" (meaning nothing's
+# changed since the last event) and "startup" (meaning we don't know what happened since the last event). An interval
+# ending in a startup event is mapped to unknown state for that device, and checkpoints establish an upper bound on how
+# long such intervals can be.
 
 import datetime
 import dateutil.parser
@@ -42,6 +37,15 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 AREA_MAGIC_GATEWAY_ID = '__area__'
 
+class EventCode(object):
+	CHANGED = 1    # changed since last
+	CHECKPOINT = 2 # unchanged since last
+	RESTART = 3    # unknown since last
+
+	@classmethod
+	def from_int(cls, i):
+		return [ 'CHANGED', 'CHECKPOINT', 'RESTART' ][i - 1];
+
 
 class SgPersistence(object):
 	def __init__(self, dbconfig):
@@ -52,7 +56,6 @@ class SgPersistence(object):
 		self._cursor = self._conn.cursor()
 		self._version = 1
 		self._init_schema()
-		self._clear_transient_values()
 		self._lock = threading.RLock()
 		self._checkpoint_interval = float(dbconfig.checkpoint_interval)
 		if self._checkpoint_interval > 0:
@@ -78,83 +81,88 @@ class SgPersistence(object):
 		# get non-overlapping ids (which isn't strictly necessary but seems like good practice)
 		return self.get_device_id(AREA_MAGIC_GATEWAY_ID, area_id)
 
-	def init_device_state(self, gateway_id, gateway_device_id, state):
-		# This is a way of updating the tables used by on_device_state_change for events missed when we weren't running
+	def record_startup(self, gateway_id, gateway_device_id, level):
 		with self._lock:
 			c = self._cursor
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			current_ts = datetime.datetime.now()
-			# want "upsert" -- "update" does nothing if the row didn't already exist; "insert or replace" creates a brand
-			# new row and, with only a subset of fields specified, will reset the unspecified fields to their default.
-			# This technique of using "insert or replace" for all fields, some of which reuse existing values when possible,
-			# comes from http://stackoverflow.com/questions/418898/sqlite-upsert-not-insert-or-replace.
-			c.execute('INSERT OR REPLACE INTO device_status(sg_device_id, last_seen_event_ts, last_tallied_ts, last_state) ' +
-			          'VALUES(?,(SELECT last_seen_event_ts from device_status where sg_device_id = ?),?,?)',
-			          (dev_id, dev_id, current_ts.isoformat(), state))
+			current_ts = datetime.datetime.now().isoformat()
+			c.execute('INSERT INTO device_events(sg_device_id, event_code, level, event_ts) VALUES(?,?,?,?)',
+				(dev_id, EventCode.RESTART, level, current_ts))
 			self._commit()
 
-	def on_device_state_change(self, gateway_id, gateway_device_id, state):
-		assert gateway_id != AREA_MAGIC_GATEWAY_ID
-		# XXX TODO: handle partial-on states (on_details)
+	def record_change(self, gateway_id, gateway_device_id, level):
 		with self._lock:
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			# query device previous state
-			prev_state = self._get_device_prev_state(dev_id)
-			# update last-change table
-			delta, ts_current = self._get_device_timedelta(dev_id, 'last_tallied') # want to use current-run-only
 			c = self._cursor
-			c.execute('INSERT OR REPLACE INTO device_status(sg_device_id, last_seen_event_ts, last_state) VALUES(?,?,?)', (dev_id, ts_current.isoformat(), state))
-			# update history bucket
-			self._tally_device_state_history(dev_id, prev_state, delta, ts_current, True)
-			# commit
-			self._commit()
-
-	def checkpoint_device_state(self, gateway_id, gateway_device_id):
-		# This is a way of updating the tables used by on_device_state_change for time passing without changes while we are running
-		with self._lock:
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			self._checkpoint_device_state(dev_id)
-			# commit
+			self._save_newest_knowledge(dev_id, EventCode.CHANGED, level)
 			self._commit()
 
 	def get_delta_since_change(self, gateway_id, gateway_device_id):
 		# get time (in seconds) since device registered a change, or None if not known (not since startup)
 		with self._lock:
+			c = self._cursor
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			delta, ts_current = self._get_device_timedelta(dev_id, 'last_seen_event') # allow timestamp reuse across restarts
-			return delta
+			# get newest event for device, ignoring checkpoint events.
+			c.execute('SELECT event_ts, event_code FROM device_events WHERE sg_device_id = ? AND event_code <> ? ORDER BY event_ts DESC LIMIT 1',
+				(dev_id, EventCode.CHECKPOINT))
+			row = c.fetchone()
+			if row is None:
+				logger.warn('No events for device %s:%s' % (gateway_id, gateway_device_id))
+				return None
+			# if newest is a change event, we can calculate delta. If it's a restart event, we cannot.
+			if row['event_code'] == EventCode.CHANGED:
+				then = self._ts_from_string(row['event_ts'])
+				return datetime.datetime.now() - then
+			else:
+				return None
 	
-	def get_action_count(self, gateway_id, gateway_device_id, bucket):
+	def get_action_count(self, gateway_id, gateway_device_id):
 		with self._lock:
 			c = self._cursor
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			history = self._get_history_bucket(dev_id, bucket)
-			return history['num_changes']
+			c.execute('SELECT COUNT(*) FROM device_events WHERE sg_device_id = ? AND event_code = ?', (dev_id, EventCode.CHANGED))
+			return c.fetchone()[0]
 		
-	def get_time_in_state(self, gateway_id, gateway_device_id, state, bucket):
+	def get_time_in_state(self, gateway_id, gateway_device_id, state):
 		# state: boolean (anything evaluating true for on, false for off)
+		delta = datetime.timedelta()
 		with self._lock:
 			c = self._cursor
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			# Find previous time-in-state (already billed and accounted in historical bucket table)
-			history = self._get_history_bucket(dev_id, bucket)
-			seconds_in_state = history['on_time' if state else 'off_time']
-			# Add current time-in-state (historical time counts only up to the last change; add time from them till now if it's still in that state)
-			c.execute('SELECT last_state FROM device_status WHERE sg_device_id = ?', (dev_id, ))
-			row = c.fetchone()
-			if row and row['last_state'] == state:
-				delta, ts_current = self._get_device_timedelta(dev_id, 'last_tallied')
-				seconds_in_state += delta.total_seconds()
-			return datetime.timedelta(seconds = seconds_in_state)
-		
-	def get_bucket_name(self, bucket):
-		# state: boolean (anything evaluating true for on, false for off)
+			# Iterate entire device history, looking at transitions where we know the state on both sides
+			# That is, from (changed or restart) to (changed or checkpoint).
+			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts ASC', (dev_id, ))
+			prev_code = None
+			prev_ts = None
+			for row in c.fetchall():
+				cur_code = row['event_code']
+				cur_ts = self._ts_from_string(row['event_ts'])
+				if prev_code == EventCode.CHANGED or prev_code == EventCode.RESTART:
+					if cur_code == EventCode.CHANGED or cur_code == EventCode.CHECKPOINT:
+						if self._level_matches_state(prev_level, state):
+							delta = delta + cur_ts - prev_ts
+				prev_code = cur_code
+				prev_ts = cur_ts
+				prev_level = row['level']
+			# Account for interval from last event to now: last event should be reliable indicator of level at time, regardless of type.
+			if self._level_matches_state(prev_level, state):
+				cur_ts = datetime.datetime.now()
+				delta = delta + cur_ts - prev_ts
+
+		return delta
+
+	def get_recent_events(self, gateway_id, gateway_device_id, count = 10):
+		with self._lock:
 			c = self._cursor
-			c.execute('SELECT * FROM bucket_defs WHERE bucket_id = ?', (bucket,))
-			row = c.fetchone()
-			return row['bucket_name']
+			dev_id = self.get_device_id(gateway_id, gateway_device_id)
+			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts DESC LIMIT ?', (dev_id, count))
+			rows = c.fetchall()
+			# XXX how to represent this... for now, just text for debug dump
+			return [(EventCode.from_int(r['event_code']), r['level'], r['event_ts']) for r in rows]
 
 	# private helpers
+	def _level_matches_state(self, level, state):
+		return (level > 0) == (state != 0)
 	def _checkpoint_all(self):
 		logger.warn('database checkpoint requested')
 		with self._lock:
@@ -168,78 +176,43 @@ class SgPersistence(object):
 	def _checkpoint_device_state(self, dev_id):
 		# Internal helper function: requires lock, does not commit; caller must take care of locking and committing
 		assert self._lock._is_owned() # XXX I want a way to check if owned *by me*!
-		# query device previous state
-		prev_state = self._get_device_prev_state(dev_id)
-		# get amount of untallied time
-		delta, ts_current = self._get_device_timedelta(dev_id, 'last_tallied')
-		# update history bucket
-		self._tally_device_state_history(dev_id, prev_state, delta, ts_current, False)
-		# note: no commit
-		
-	def _tally_device_state_history(self, dev_id, prev_state, delta, ts_current, changed):
-		# Internal helper function: requires lock, does not commit; caller must take care of locking and committing
-		assert self._lock._is_owned() # XXX I want a way to check if owned *by me*!
-		# update history bucket
-		time_in_prev_state = delta.total_seconds() if delta else 0
-		history = self._get_history_bucket(dev_id, 1)
-		on_time, off_time = (history['on_time'], history['off_time'])
-		if prev_state == 0: # was off, tally some off_time
-			logger.debug('adding %g sec to %g sec of off_time for did %d' % (time_in_prev_state, off_time, dev_id))
-			off_time += time_in_prev_state
-		elif prev_state > 0: # was on, tally some on_time
-			logger.debug('adding %g sec to %g sec of on_time for did %d' % (time_in_prev_state, on_time, dev_id))
-			on_time += time_in_prev_state
-		else: # note that we ignore any changes from prev_state == -1
-			logger.debug('ignoring %g sec in unknown state for did %d' % (time_in_prev_state, dev_id))
-		num_changes = history['num_changes']
-		if changed:
-			num_changes += 1
+		self._save_newest_knowledge(dev_id, EventCode.CHECKPOINT)
+
+	def _save_newest_knowledge(self, dev_id, event_code, level = 0):
+		# Used when saving a checkpoint or a change event: if the newest previous event for this device is a checkpoint,
+		# overwrite it, otherwise add a new event.
 		c = self._cursor
-		c.execute('INSERT OR REPLACE INTO change_history_buckets(sg_device_id, bucket_id, num_changes, on_time, off_time) VALUES(?,?,?,?,?)',
-		          (dev_id, 1, num_changes, on_time, off_time))
-		# update last-tallied time in device-state table
-		c.execute('UPDATE device_status SET last_tallied_ts = ? WHERE sg_device_id = ?', (ts_current, dev_id))
-		# note: no commit
-		
-	def _get_device_prev_state(self, dev_id):
-		assert self._lock._is_owned() # XXX I want a way to check if owned *by me*!
-		c = self._cursor
-		c.execute('SELECT last_state FROM device_status WHERE sg_device_id = ?', (dev_id, ))
+		current_ts = datetime.datetime.now().isoformat()
+		# find newest record for dev_id
+		c.execute('SELECT event_code, event_ts, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts DESC LIMIT 1', (dev_id, ))
 		row = c.fetchone()
-		if row:
-			prev_state = row['last_state']
-		else:
-			prev_state = -1
-		return prev_state
+		# checkpoint events get replaced (with newer checkpoint, or explicit level change)
+		if row is not None and row['event_code'] == EventCode.CHECKPOINT:
+			old_ts = row['event_ts']
+			if event_code == EventCode.CHECKPOINT: # reuse checkpoint by updating timestamp
+				c.execute('UPDATE device_events SET event_ts = ? WHERE sg_device_id = ? AND event_ts = ?',
+					(current_ts, dev_id, old_ts))
+			else: # replace checkpoint with CHANGED event
+				c.execute('UPDATE device_events SET event_code = ?, level = ?, event_ts = ? WHERE sg_device_id = ? AND event_ts = ?',
+					(event_code, level, current_ts, dev_id, old_ts))
+		else: # not a checkpoint event, so add a new event
+			if event_code == EventCode.CHECKPOINT: # new checkpoint
+				# We'd better take a checkpoint only after a previous record, so row.level should be safe to use here
+				if row is None:
+					logger.warn('No events for device %d, cannot checkpoint' % dev_id)
+					return
+				c.execute('INSERT INTO device_events(sg_device_id, event_code, level, event_ts) VALUES(?,?,?,?)',
+					(dev_id, EventCode.CHECKPOINT, row['level'], current_ts))
+			else: # new CHANGED event
+				# NB that row may well be None here; we can't (and don't need to) reference it
+				c.execute('INSERT INTO device_events(sg_device_id, event_code, level, event_ts) VALUES(?,?,?,?)',
+					(dev_id, event_code, level, current_ts))
 
 	def _commit(self):
 		self._conn.commit()
 
 	def _ts_from_string(self, ts_string):
 		return dateutil.parser.parse(ts_string)
-
-	def _get_device_timedelta(self, device_id, column_name_base):
-		# Returns tuple: delta since last change to device, and 'now' value used in that calculation, useful for atomicity
-		current_ts = datetime.datetime.now()
-		c = self._cursor
-		ts_column = column_name_base + '_ts'
-		c.execute('SELECT %s FROM device_status WHERE sg_device_id = ?' % ts_column, (device_id, )) # verified-safe use of % string replacement in SQL query
-		row = c.fetchone()
-		if row and row[0]:
-			delta = current_ts - self._ts_from_string(row[0])
-		else: # treat row with NULL value same as empty row, and start from now (nothing known about prior state, so no time elapsed in prior state)
-			delta = None
-		return (delta, current_ts)
-
-	def _get_history_bucket(self, device_id, bucket):
-		# Return (at least) a dict with num_changes, on_time and off_time.
-		# This might be a row from the db if it exists, or a dict object mapping everything to 0 otherwise.
-		c = self._cursor
-		c.execute('SELECT * FROM change_history_buckets WHERE sg_device_id = ? AND bucket_id = ?', (device_id, bucket))
-		history = c.fetchone()
-		if not history: # create a fake "row" object usable as a dictionary with the values we care about
-			history = { 'num_changes': 0, 'on_time': 0, 'off_time': 0 }
-		return history
 
 	def _init_schema(self):
 		c = self._cursor
@@ -263,13 +236,6 @@ class SgPersistence(object):
 			logger.debug('init_schema: creating tables')
 			self._create_schema()
 			
-	def _clear_transient_values(self):
-		# Clear out fields which are not intended to persist beyond the lifetime of a single process.
-		# (XXX: arguably such stuff should live only in the object model and not in the persistence layer....)
-		c = self._cursor
-		c.execute('UPDATE device_status SET last_tallied_ts = NULL, last_state = -1')
-		self._commit()
-
 	def _create_schema(self):
 		c = self._cursor
 		sql_cmds = '''
@@ -281,24 +247,13 @@ class SgPersistence(object):
 		CREATE TABLE device_map (gateway_id STRING NOT NULL, gateway_device_id STRING NOT NULL, sg_device_id INTEGER PRIMARY KEY AUTOINCREMENT);
 		CREATE INDEX device_map_index ON device_map(gateway_id, gateway_device_id);
 
-		-- device status for time-in-state tracking
-		-- last_seen_event_ts: last time we saw device change (persists across restart, there may have been newer changes we didn't see) -- useful to say 'last known event''
-		-- last_tallied_ts: last time we tallied current state (this table) into history buckets (change_history_buckets table) -- reset at process start, so authoritative
-		-- last_state: last known device state, this run only (state as of the last change)
-		CREATE TABLE device_status (sg_device_id INTEGER PRIMARY KEY, last_seen_event_ts STRING, last_tallied_ts STRING, last_state INTEGER,
+		-- device event history
+		-- sg_device_id: index into device_map
+		-- event_code: 1 == changed, 2 == status checkpoint (no change since previous event), 3 == restart (unknown since previous event)
+		-- level: level associated with current event
+		-- event_ts: timestamp
+		CREATE TABLE device_events (sg_device_id INTEGER, event_code INTEGER, level INTEGER, event_ts STRING,
 		                            FOREIGN KEY(sg_device_id) REFERENCES device_map(sg_device_id));
-
-		-- history buckets
-		CREATE TABLE bucket_defs (bucket_id INTEGER, bucket_name STRING, bucket_description STRING);
-		INSERT INTO bucket_defs VALUES(1, 'day', 'today');
-		INSERT INTO bucket_defs VALUES(2, 'month', 'this month');
-		INSERT INTO bucket_defs VALUES(3, 'year', 'this year');
-		INSERT INTO bucket_defs VALUES(4, 'lifetime', 'since installation');
-
-		-- history counters, per device, per bucket
-		CREATE TABLE change_history_buckets (sg_device_id INTEGER, bucket_id INTEGER, num_changes INTEGER, on_time INTEGER, on_details INTEGER, off_time INTEGER,
-		                                     PRIMARY KEY(sg_device_id, bucket_id), FOREIGN KEY(sg_device_id) REFERENCES device_map(sg_device_id),
-		                                     FOREIGN KEY(bucket_id) REFERENCES bucket_defs(bucket_id));
 		''' % self._version # Yes, in general we should use db's ? string-formatting and not python's %, but this use is safe since we control the value of self.version
 		c.executescript(sql_cmds)
 		self._commit()
@@ -316,9 +271,11 @@ class SgPersistence(object):
 				logger.warn("Exiting on signal %d" % signum)
 				sys.exit()
 
-		signal.signal(signal.SIGINT, handle_signal)
 		signal.signal(signal.SIGHUP, handle_signal)
+		signal.signal(signal.SIGINT, handle_signal)
 		signal.signal(signal.SIGTERM, handle_signal)
+		signal.signal(signal.SIGQUIT, handle_signal)
+		# XXX I'd like this to trigger for werkzeug's reloader, but don't know how to catch that
 	
 	def _install_periodic_checkpointer(self):
 		def checkpoint_callback(self):
