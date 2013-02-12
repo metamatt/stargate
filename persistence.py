@@ -115,14 +115,16 @@ class SgPersistence(object):
 				return datetime.datetime.now() - then
 			else:
 				return None
-	
-	def get_action_count(self, gateway_id, gateway_device_id):
+
+	def get_action_count(self, gateway_id, gateway_device_id, age_limit = None):
 		with self._lock:
 			c = self._cursor
 			dev_id = self.get_device_id(gateway_id, gateway_device_id)
-			c.execute('SELECT COUNT(*) FROM device_events WHERE sg_device_id = ? AND event_code = ?', (dev_id, EventCode.CHANGED))
+			start_time = (datetime.datetime.now() - age_limit).isoformat() if age_limit is not None else '0'
+			c.execute('SELECT COUNT(*) FROM device_events WHERE sg_device_id = ? AND event_code = ? AND event_ts > ?',
+				(dev_id, EventCode.CHANGED, start_time))
 			return c.fetchone()[0]
-		
+
 	def get_time_in_state(self, gateway_id, gateway_device_id, state):
 		# state: boolean (anything evaluating true for on, false for off)
 		delta = datetime.timedelta()

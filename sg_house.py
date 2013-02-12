@@ -107,8 +107,7 @@ class StargateDevice(object):
 		# special case "age=NNN"
 		if state[:4] == 'age=':
 			age_limit = datetime.timedelta(seconds = int(state[4:]))
-			age = self.get_delta_since_change()
-			return age is not None and age < age_limit
+			return self.get_action_count(age_limit) > 0
 		# look for handler named after state
 		handler = 'is_' + state
 		if hasattr(self, handler):
@@ -142,8 +141,8 @@ class StargateDevice(object):
 	def get_delta_since_change(self):
 		return self.house.persist.get_delta_since_change(self.gateway.gateway_id, self.gateway_devid)
 		
-	def get_action_count(self):
-		return self.house.persist.get_action_count(self.gateway.gateway_id, self.gateway_devid)
+	def get_action_count(self, age_limit = None):
+		return self.house.persist.get_action_count(self.gateway.gateway_id, self.gateway_devid, age_limit)
 		
 	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
 	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
