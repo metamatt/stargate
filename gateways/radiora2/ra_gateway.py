@@ -41,10 +41,10 @@ class LutronDevice(sg_house.StargateDevice):
 
 class OutputDevice(LutronDevice):
 	# Common device subclass for controllable outputs (lights, shades, appliances).
+	level_step = 100
 
 	def __init__(self, ra_area, device_spec):
 		super(OutputDevice, self).__init__('output', ra_area, device_spec.iid, device_spec.name)
-		self.level_step = 100
 
 	# interface to get/set output levels (device scope)
 	def get_level(self):
