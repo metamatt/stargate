@@ -43,6 +43,7 @@ class DscPartition(sg_house.StargateDevice):
 		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition:%d' % partition_num, name)
 
 	# as a control: this should be able to arm/disarm (read and write)
+	# XXX: should be able to report ready/open status as history events
 
 
 class DscZoneSensor(sg_house.StargateDevice):
@@ -134,8 +135,11 @@ class DscGateway(sg_house.StargateGateway):
 		self.panel_server.send_dsc_command(command, data)
 
 	# panel action callback
-	def on_user_action(self, zone_id, state, refresh):
-		logger.debug('panel action zone %d' % zone_id)
-		if self.zones_by_id.has_key(zone_id):
-			device = self.zones_by_id[zone_id] # XXX should handle other event sources: partition, command-output
-			device.on_user_action(state, refresh)
+	def on_user_action(self, dev_type, zone_id, state, refresh):
+		if dev_type == 'zone':
+			logger.debug('panel action zone %d' % zone_id)
+			if self.zones_by_id.has_key(zone_id):
+				device = self.zones_by_id[zone_id] # XXX should handle other event sources: partition, command-output
+				device.on_user_action(state, refresh)
+		else:
+			logger.warn('ignoring action for %s:%s' % (dev_type, zone_id))

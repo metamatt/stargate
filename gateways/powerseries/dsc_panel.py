@@ -47,20 +47,21 @@ class DscPanelCache(object):
 	def _record_zone_status(self, zone_num, status):
 		# should be called only by DscPanelServer._receive_dsc_cmd()
 		logger.info('_record_zone_state: zone %d status %d' % (zone_num, status))
+		old_status = self.zone_status[zone_num]
 		self.zone_status[zone_num] = status
-		self._broadcast_change(zone_num, status)
+		self._broadcast_change('zone', zone_num, status, old_status)
 
 	def _record_partition_status(self, partition_num, status):
 		# should be called only by DscPanelServer._receive_dsc_cmd()
 		logger.info('_record_partition_state: partition %d status %d' % (partition_num, status))
+		old_status = self.partition_status[partition_num]
 		self.partition_status[partition_num] = status
-		self._broadcast_change(partition_num, status)
+		self._broadcast_change('partition', partition_num, status, old_status)
 
-	def _broadcast_change(self, dev_id, state):
-		refresh = False # XXX
-		# XXX we're not distinguishing between event sources (zone, partition, command-output), and definitely need to.
-		logger.debug('broadcast_change: sending on_user_action(dev_id=%s, refresh=%s)' % (dev_id, str(refresh)))
-		self.event_sink.on_user_action(dev_id, state, refresh)
+	def _broadcast_change(self, dev_type, dev_id, state, old_status):
+		refresh = (old_status == 'stale')
+		logger.debug('broadcast_change: sending on_user_action(dev_id=%s:%s, refresh=%s)' % (dev_type, dev_id, str(refresh)))
+		self.event_sink.on_user_action(dev_type, dev_id, state, refresh)
 
 
 class CrlfSocketBuffer(object):
