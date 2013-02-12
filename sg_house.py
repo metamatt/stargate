@@ -5,6 +5,7 @@
 # This module provides the common glue between gateway modules, and the
 # object model common to the whole system.
 
+import datetime
 import logging
 
 import events
@@ -105,12 +106,10 @@ class StargateDevice(object):
 	def is_in_state(self, state):
 		# special case "age=NNN"
 		if state[:4] == 'age=':
-			age_max = int(state[4:])
-			delta = self.get_delta_since_change()
-			if not delta:
-				return False
-			my_age = delta.days * 86400 + delta.seconds
-			return my_age < age_max
+			age_limit = datetime.timedelta(seconds = int(state[4:]))
+			age = self.get_delta_since_change()
+			print 'device %s:%s change delta %s' % (self.gateway, self.gateway_devid, str(age))
+			return age is not None and age < age_limit
 		# look for handler named after state
 		handler = 'is_' + state
 		if hasattr(self, handler):
