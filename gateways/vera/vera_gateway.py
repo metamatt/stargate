@@ -80,9 +80,6 @@ class VeraDoorLock(VeraDevice):
 		if locked != self.last_locked_state:
 			self.last_locked_state = locked
 			self.house.events.on_device_state_change(self)
-			
-	def get_event_persist_state(self):
-		return self.last_locked_state
 
 
 class VeraRoom(object):

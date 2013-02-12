@@ -30,13 +30,7 @@ class LutronDevice(sg_house.StargateDevice):
 		self.gateway._register_device(self)
 		
 	def on_user_action(self, level, synthetic):
-		self.event_persist_level = level # XXX need better name. Want to store bool state (on/off) and int details (brightness or whatever?)
 		self.house.events.on_device_state_change(self, synthetic) # state
-		
-	# XXX these as well need better names
-	def get_event_persist_state(self):
-		return self.event_persist_level
-	# don't override get_event_persist_details (which base class should implement as returning None)
 
 
 class OutputDevice(LutronDevice):
@@ -55,12 +49,6 @@ class OutputDevice(LutronDevice):
 
 	def get_name_for_level(self, level):
 		return 'on' if level > 0 else 'off'
-
-	def get_event_persist_state(self):
-		return self.event_persist_level > 0
-
-	def get_event_persist_details(self):
-		return self.event_persist_level
 	
 
 class SwitchedOutput(OutputDevice):

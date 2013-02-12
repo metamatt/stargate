@@ -68,13 +68,7 @@ class DscZoneSensor(sg_house.StargateDevice):
 		return not self.is_open()
 
 	def on_user_action(self, level, synthetic):
-		self.event_persist_level = level # XXX need better name. Just bool state (open/closed)
 		self.house.events.on_device_state_change(self, synthetic) # state
-
-	# XXX these as well need better names
-	def get_event_persist_state(self):
-		return self.event_persist_level
-	# don't override get_event_persist_details (which base class should implement as returning None)
 
 
 class DscGateway(sg_house.StargateGateway):

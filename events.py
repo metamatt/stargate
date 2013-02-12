@@ -37,15 +37,15 @@ class SgEvents(object):
 	def on_device_state_change(self, device, synthetic = False):
 		gateway_id = device.gateway.gateway_id
 		gateway_device_id = device.gateway_devid
-		state = device.get_event_persist_state()
+		level = device.get_level()
 
 		# call registered handlers interested in this specific device
 		self.notify_subscribers(device, synthetic)
 
 		# forward all events to persist
 		if synthetic:
-			logger.info('device X reports state currently Y (synthetic, no change)')
-			self.persist.record_startup(gateway_id, gateway_device_id, state)
+			logger.info('device %s:%s reports state currently %s (synthetic, no change)' % (gateway_id, gateway_device_id, level))
+			self.persist.record_startup(gateway_id, gateway_device_id, level)
 		else:
-			logger.info('device X reports state change to Y')
-			self.persist.record_change(gateway_id, gateway_device_id, state)
+			logger.info('device %s:%s reports state change to %s' % (gateway_id, gateway_device_id, level))
+			self.persist.record_change(gateway_id, gateway_device_id, level)
