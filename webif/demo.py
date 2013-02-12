@@ -187,9 +187,14 @@ def debug_break():
 def not_found(error = None):
 	return render_template('error.html', request_path = request.path, referrer = request.referrer), 404
 
+def seconds_today():
+	now = datetime.datetime.now()
+	today = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+	return now - today
+
 @app.context_processor
 def inject_house():
-	return dict(house = house, debug = app.debug)
+	return dict(house = house, debug = app.debug, seconds_today = seconds_today)
 
 def human_readable_timedelta(delta, text_if_none = 'unknown'):
 	if not delta:
