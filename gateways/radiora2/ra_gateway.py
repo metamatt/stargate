@@ -218,14 +218,29 @@ class RepeaterKeypadDevice(KeypadDevice):
 
 class MotionSensorDevice(ControlDevice):
 	devtype = 'occ-sensor'
-	possible_states = ('vacant', 'occupied')
+	possible_states = ('vacant', 'occupied', 'dormant')
 
-	# XXX should implement is_vacant and is_occupied.
-	# XXX implement get_name_for_level to prevent exception, but it's probably not right.
+	# Motion sensors act somewhat like a keypad with only button 2; they send press and release events
+	# (press meaning occupied and release meaning vacant) for component ID 2. Unlike a keypad, they
+	# can't be queried (I think to extend battery life they're send-only and only on edge triggers).
+
+	def get_level(self):
+		try:
+			return self.gateway._get_button_state(self.iid, 2)
+		except:
+			return -1 # if we haven't heard from the device, the above will get a KeyError; nothing we can do about that.
+
+	def is_occupied(self):
+		return self.get_level() > 0
+
+	def is_vacant(self):
+		return self.get_level() == 0
+
+	def is_dormant(self):
+		return self.get_level() < 0
+
 	def get_name_for_level(self, level):
-		# XXX I don't know if this is true, or if the levels it sends even have a direct
-		# mapping to occupied/vacant.
-		return 'vacant' if level > 0 else 'occupied'
+		return 'occupied' if level > 0 else 'vacant' if level == 0 else 'dormant'
 
 
 def create_device_for_output(ra_area, output_spec):
