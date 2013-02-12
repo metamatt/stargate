@@ -142,6 +142,9 @@ class StargateDevice(object):
 		return self.house.persist.get_delta_since_change(self.gateway.gateway_id, self.gateway_devid)
 		
 	def get_action_count(self, age_limit = None):
+		# allow callers to pass age_limit as a timedelta, but also allow templates to pass it as time in seconds
+		if isinstance(age_limit, int):
+			age_limit = datetime.timedelta(seconds = age_limit)
 		return self.house.persist.get_action_count(self.gateway.gateway_id, self.gateway_devid, age_limit)
 		
 	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
