@@ -220,6 +220,13 @@ class MotionSensorDevice(ControlDevice):
 	devtype = 'occ-sensor'
 	possible_states = ('vacant', 'occupied')
 
+	# XXX should implement is_vacant and is_occupied.
+	# XXX implement get_name_for_level to prevent exception, but it's probably not right.
+	def get_name_for_level(self, level):
+		# XXX I don't know if this is true, or if the levels it sends even have a direct
+		# mapping to occupied/vacant.
+		return 'vacant' if level > 0 else 'occupied'
+
 
 def create_device_for_output(ra_area, output_spec):
 	# Static factory for correct OutputDevice subclass matching Lutron OutputType.
