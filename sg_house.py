@@ -108,7 +108,6 @@ class StargateDevice(object):
 		if state[:4] == 'age=':
 			age_limit = datetime.timedelta(seconds = int(state[4:]))
 			age = self.get_delta_since_change()
-			print 'device %s:%s change delta %s' % (self.gateway, self.gateway_devid, str(age))
 			return age is not None and age < age_limit
 		# look for handler named after state
 		handler = 'is_' + state
