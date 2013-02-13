@@ -29,7 +29,7 @@ class LutronDevice(sg_house.StargateDevice):
 		self.iid = iid
 		self.gateway._register_device(self)
 		
-	def on_user_action(self, level, synthetic):
+	def on_user_action(self, level, synthetic, comp_id):
 		self.house.events.on_device_state_change(self, synthetic) # state
 
 
@@ -148,9 +148,17 @@ class ControlDevice(LutronDevice):
 		super(ControlDevice, self).__init__('control', ra_area, device_spec.iid, device_spec.name)
 
 
-class KeypadButton(object):
-	def __init__(self, device, button_cid, label, led_cid):
-		self.device = device
+class KeypadButton(sg_house.StargateDevice):
+	devclass = 'control'
+	devtype = 'keypad'
+	possible_states = ('pressed', 'unpressed')
+	hide_from_enumeration = True
+
+	def __init__(self, keypad, button_cid, label, led_cid):
+		dev_id = '%dbtn%d' % (keypad.iid, button_cid)
+		name = 'Button %d on %s' % (button_cid, keypad.name)
+		super(KeypadButton, self).__init__(keypad.house, keypad.area, keypad.gateway, dev_id, name)
+		self.keypad = keypad
 		self.button_cid = button_cid
 		self.label = label
 		self.led_cid = led_cid
@@ -159,21 +167,27 @@ class KeypadButton(object):
 		return self.led_cid is not None
 
 	def get_button_state(self):
-		return self.device.gateway._get_button_state(self.device.iid, self.button_cid)
+		return self.gateway._get_button_state(self.keypad.iid, self.button_cid)
 
 	def get_led_state(self):
-		return self.device.gateway._get_led_state(self.device.iid, self.led_cid)
+		return self.gateway._get_led_state(self.keypad.iid, self.led_cid)
 		
 	def set_button_state(self, pressed):
-		self.device.gateway._set_button_state(self.device.iid, self.button_cid, pressed)
+		self.gateway._set_button_state(self.keypad.iid, self.button_cid, pressed)
 		
 	def set_led_state(self, on):
-		self.device.gateway._set_led_state(self.device.iid, self.led_cid, on)
+		self.gateway._set_led_state(self.keypad.iid, self.led_cid, on)
+
+	def get_level(self):
+		return self.get_button_state()
+
+	def get_name_for_level(self, level):
+		return 'pressed' if level > 0 else 'unpressed'
 
 
 class KeypadDevice(ControlDevice):
 	devtype = 'keypad'
-	possible_states = () # XXX pressed/unpressed, but these apply to individual buttons
+	possible_states = ('active', 'inactive') # XXX pressed/unpressed, but these apply to individual buttons
 
 	def __init__(self, ra_area, device_spec):
 		super(KeypadDevice, self).__init__(ra_area, device_spec)
@@ -201,11 +215,29 @@ class KeypadDevice(ControlDevice):
 			return 0
 		return reduce(lambda x, y: x+y, [(1 if b.get_button_state() else 0) for b in self.buttons.values()])
 		
+	def on_user_action(self, level, synthetic, comp_id):
+		# Override this to proxy for the button. Lutron object model doesn't consider the button
+		# a device, just an id on a keypad device. Stargate object model tracks events and state
+		# by device. So keypad buttons are a Stargate device even though they're not a Lutron
+		# device, and when an event happens to the Lutron keypad device, we proxy it to the
+		# button (Stargate) device for event history.
+		button = self.buttons[comp_id]
+		self.house.events.on_device_state_change(button, synthetic) # state
+
+	def get_child_ids(self):
+		return [button.device_id for button in self.buttons.values()]
+
 	def get_level(self):
 		return self.get_num_buttons_pressed()
 
+	def is_active(self):
+		return self.get_num_buttons_pressed() > 0
+
+	def is_inactive(self):
+		return not self.is_active()
+
 	def get_name_for_level(self, level):
-		return 'pressed' if level > 0 else 'unpressed'
+		return 'active' if level > 0 else 'inactive'
 
 
 class RemoteKeypadDevice(KeypadDevice):
@@ -338,10 +370,10 @@ class RaGateway(sg_house.StargateGateway):
 		return self.devices[iid]
 
 	# repeater action callback
-	def on_user_action(self, iid, state, refresh):
-		logger.debug('repeater action iid %d' % iid)
+	def on_user_action(self, iid, state, refresh, comp_id):
+		logger.debug('repeater action iid %d cid %d' % (iid, comp_id))
 		device = self.devices[iid]
-		device.on_user_action(state, refresh)
+		device.on_user_action(state, refresh, comp_id)
 	
 	# private interface for owned objects to populate node tree
 	def _register_device(self, device):

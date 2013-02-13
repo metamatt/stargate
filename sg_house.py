@@ -127,6 +127,9 @@ class StargateDevice(object):
 	def get_current_states(self):
 		return [state for state in self.get_possible_states() if self.is_in_state(state)]
 
+	def get_child_ids(self):
+		return []
+
 	# XXX see if these still make sense
 	def get_possible_states(self):
 		if not self._possible_states:
@@ -186,7 +189,7 @@ class StargateArea(object):
 		return self.house._register_area(area)
 
 	def get_recent_events(self, count = 10):
-		dev_ids = [dev.device_id for dev in self._get_all_devices_below()]
+		dev_ids = [dev.device_id for dev in self._get_all_devices_below(force_enumerate = True)]
 		return self.house.persist.get_recent_events(dev_ids, count)
 	
 	# Area/Device/House relation:
@@ -213,8 +216,8 @@ class StargateArea(object):
 			areas.extend(a._get_all_areas_below())
 		return areas
 
-	def _get_all_devices_below(self):
-		devs = list(self.devices)
+	def _get_all_devices_below(self, force_enumerate = False):
+		devs = [d for d in self.devices if force_enumerate or not hasattr(d, 'hide_from_enumeration')]
 		for a in self.areas:
 			devs.extend(a._get_all_devices_below())
 		return devs
@@ -372,6 +375,9 @@ class StargateHouse(StargateArea):
 
 	def get_recent_events(self, devices, count = 10):
 		dev_ids = [dev.device_id for dev in devices]
+		# include child devices, e.g. Lutron keypad buttons
+		for dev in devices:
+			dev_ids.extend(dev.get_child_ids())
 		return self.persist.get_recent_events(dev_ids, count)
 
 
