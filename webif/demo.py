@@ -3,6 +3,7 @@
 # Simple web UI for Stargate.
 
 import datetime
+import dateutil.parser
 import time
 
 from flask import Flask, request, render_template, redirect, url_for
@@ -218,6 +219,14 @@ def human_readable_timedelta(delta, text_if_none = 'unknown'):
 	else:
 		return 'less than a second'
 
+def human_readable_event(event):
+	if event.reason == 'CHANGED':
+		desc = 'Change level to ' + str(event.level)
+	else:
+		desc = event.reason
+	delta = datetime.datetime.now() - dateutil.parser.parse(event.timestamp)
+	return '%s at %s (%s ago)' % (desc, event.timestamp, human_readable_timedelta(delta))
+
 def stash_house(theHouse):
 	global house
 	house = theHouse
@@ -225,6 +234,7 @@ def stash_house(theHouse):
 	app.jinja_env.filters['order_device_states'] = house.order_device_states
 	app.jinja_env.filters['order_device_types'] = house.order_device_types
 	app.jinja_env.filters['human_readable_timedelta'] = human_readable_timedelta
+	app.jinja_env.filters['human_readable_event'] = human_readable_event
 
 
 def start(theHouse, port = None, public = False, webdebug = False):

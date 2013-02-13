@@ -31,6 +31,8 @@ import sys
 import threading
 import time
 
+from sg_util import AttrDict
+
 
 logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
@@ -150,6 +152,12 @@ class SgPersistence(object):
 	def get_recent_events(self, dev_id, count = 10, include_synthetic = False):
 		# dev_id can be a single device id, or a list of device ids
 		# we look only at CHANGED events unless include_synthetic is true, in which case we look at all events
+		# XXX it would be nice to allow the cap to be specified as an age instead of a count (useful for showing
+		# history of devices associated with an age query).
+		# XXX the following 1,2,3 is hardcoded, and nothing probably wants the include_synthetic case anyway, and
+		# in the other case it would be more efficient to use =1 instead of IN(1). But then we'd need another
+		# permutation on the command string. Plus if we do the above age cap thing we need yet another permutation
+		# on the command string. Need a better way to build SQL command strings.
 		eligible_events = '1,2,3' if include_synthetic else str(EventCode.CHANGED)
 		with self._lock:
 			c = self._cursor
@@ -166,26 +174,12 @@ class SgPersistence(object):
 					'WHERE sg_device_id = ? AND event_code IN (?) ORDER BY event_ts DESC LIMIT ?',
 					(dev_id, eligible_events, count))
 
-			# XXX string formatting code doesn't belong here
-			# XXX and I want access to demo.human_readable_timedelta()
-			events = []
-			for row in c:
-				if row['event_code'] == EventCode.CHANGED:
-					desc = 'Change level to ' + str(row['level']) + ' at '
-				elif row['event_code'] == EventCode.CHECKPOINT:
-					desc = 'Checkpoint state as level ' + str(row['level']) + ' at '
-				else: # row['event_code'] == EventCode.RESTART:
-					desc = 'Stargate restart at '
-				ts = row['event_ts']
-				def time_ago(ts):
-					then = dateutil.parser.parse(ts)
-					now = datetime.datetime.now()
-					delta = now - then
-					return str(delta)
-				desc = desc + ts + " (%s ago)" % time_ago(ts)
-				events.append({ 'source_did': row['sg_device_id'], 'desc': desc })
-				# event = (EventCode.from_int(row['event_code']), row['level'], row['event_ts'])
-			return events
+			return [AttrDict({
+				'device_id': row['sg_device_id'],
+				'reason': EventCode.from_int(row['event_code']),
+				'level': row['level'],
+				'timestamp': row['event_ts']
+			}) for row in c]
 
 	# private helpers
 	def _level_matches_state(self, level, state):

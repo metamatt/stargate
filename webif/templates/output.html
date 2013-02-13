@@ -37,7 +37,7 @@
 	</table></ul>
 	<p>Recent events:<ul>
 		{% for ev in device.get_recent_events() %}
-			<li>{{ ev['desc'] }}</li>
+			<li>{{ ev | human_readable_event }}</li>
 		{% endfor %}
 	</ul></p>
 </font></p>
