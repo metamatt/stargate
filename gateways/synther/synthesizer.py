@@ -127,31 +127,33 @@ class Paranoid(object):
 		house = synthesizer.house
 
 		# Locate devices to operate on
-		# XXX for now, behavior is hardcoded to handle powerseries zone -> email
-		dsc_zone = house.get_device_by_gateway_and_id('powerseries', 'zone:%d' % params['dsc_zone'])
+		gateway = params['gateway']
+		dev_to_watch = house.get_device_by_gateway_and_id(gateway, params['device'])
 		delay = params['delay']
 		notify_addr = params['notify']
+		bad_state = params['state']
+		watched_dev_in_bad_state = getattr(dev_to_watch, 'is_' + bad_state)
 
-		# Watch when DSC says it changed
+		# Watch when gateway says it changed
 		class NonlocalState(object): # to supply writable state in nonlocal scope for nested functions to follow
 			def __init__(self):
 				self.timer_token = None
 		state = NonlocalState()
 		def on_delay():
 			logger.debug('synther.paranoid: delay elapsed; send mail to ' + notify_addr)
-			msg = ('Security zone "%s" has been open for %d seconds.\n\n' +
-			       'You will not be notified again until it closes and reopens.') % (dsc_zone.name, delay)
+			msg = ('Watched device "%s" has been "%s" for %d seconds.\n\n' +
+			       'You will not be notified again until it changes.') % (dev_to_watch.name, bad_state, delay)
 			house.notify.email(notify_addr, msg, 'Stargate: door open warning')
 		def on_change(synthetic):
-			logger.debug('synther.paranoid: dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
-			if dsc_zone.is_open():
+			logger.debug('synther.paranoid: dev %s:%s changed to %s' % (gateway, dev_to_watch.name, watched_dev_in_bad_state()))
+			if watched_dev_in_bad_state():
 				if state.timer_token is None:
 					state.timer_token = house.timer.add_event(delay, on_delay)
 			else:
 				if state.timer_token is not None:
 					house.timer.cancel_event(state.timer_token)
 					state.timer_token = None
-		house.events.subscribe(dsc_zone, on_change)
+		house.events.subscribe(dev_to_watch, on_change)
 		# Call once now so if it's open, we start counting
 		on_change(True)
 

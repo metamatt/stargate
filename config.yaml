@@ -139,9 +139,11 @@ gateways:
 
         # paranoid: send alert email if a zone is open too long. Delay is in seconds.
         paranoid:
-            - { dsc_zone: 1, delay: 1800, notify: matt@ginzton.net } # garage door: 1/2 hour
-            - { dsc_zone: 2, delay: 3600, notify: matt@ginzton.net } # side door: 1 hour
-            - { dsc_zone: 3, delay: 14400, notify: matt@ginzton.net } # alley: 4 hours
-            - { dsc_zone: 9, delay: 7200, notify: matt@ginzton.net } # back door: 2 hours
-            - { dsc_zone: 17, delay: 300, notify: matt@ginzton.net } # front door: 5 minutes
-            - { dsc_zone: 18, delay: 28800, notify: matt@ginzton.net } # back door: 8 hours
+            - { gateway: powerseries, device: 'zone:1', state: open, delay: 1800, notify: matt@ginzton.net } # garage door: 1/2 hour
+            - { gateway: powerseries, device: 'zone:2', state: open, delay: 3600, notify: matt@ginzton.net } # side door: 1 hour
+            - { gateway: vera, device: 17, state: unlocked, delay: 28800, notify: matt@ginzton.net } # side door lock: 8 hours
+            - { gateway: powerseries, device: 'zone:3', state: open, delay: 14400, notify: matt@ginzton.net } # alley door: 4 hours
+            - { gateway: vera, device: 18, state: unlocked, delay: 28800, notify: matt@ginzton.net } # alley door lock: 8 hours
+            - { gateway: powerseries, device: 'zone:9', state: open, delay: 7200, notify: matt@ginzton.net } # back door: 2 hours
+            - { gateway: powerseries, device: 'zone:17', state: open, delay: 300, notify: matt@ginzton.net } # front door: 5 minutes
+            - { gateway: powerseries, device: 'zone:18', state: open, delay: 28800, notify: matt@ginzton.net } # back door: 8 hours
