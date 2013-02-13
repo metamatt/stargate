@@ -139,22 +139,22 @@ class StargateDevice(object):
 		return self._possible_actions
 	
 	def get_delta_since_change(self):
-		return self.house.persist.get_delta_since_change(self.gateway.gateway_id, self.gateway_devid)
+		return self.house.persist.get_delta_since_change(self.device_id)
 		
 	def get_action_count(self, age_limit = None):
 		# allow callers to pass age_limit as a timedelta, but also allow templates to pass it as time in seconds
 		if isinstance(age_limit, int):
 			age_limit = datetime.timedelta(seconds = age_limit)
-		return self.house.persist.get_action_count(self.gateway.gateway_id, self.gateway_devid, age_limit)
+		return self.house.persist.get_action_count(self.device_id, age_limit)
 		
 	# XXX 'levelstate' to distinguish it from level (0-100) or state (string on/off/open/closed/depends on device);
 	# 'levelstate' is evaluated in a boolean context, true meaning on/open, false meaning off/closed. In particular,
 	# it's allowed to pass a level as the levelstate.
 	def get_time_in_state(self, levelstate):
-		return self.house.persist.get_time_in_state(self.gateway.gateway_id, self.gateway_devid, levelstate)
+		return self.house.persist.get_time_in_state(self.device_id, levelstate)
 
 	def get_recent_events(self, count = 10):
-		return self.house.persist.get_recent_events(self.gateway.gateway_id, self.gateway_devid, count)
+		return self.house.persist.get_recent_events(self.device_id, count)
 
 
 class StargateArea(object):

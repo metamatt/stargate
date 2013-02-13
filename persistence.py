@@ -62,7 +62,6 @@ class SgPersistence(object):
 			self._install_periodic_checkpointer()
 
 	# public interface
-	# XXX: should public methods work directly on sg_devid instead of (gateway_id, gateway_devid) pairs?
 	def get_device_id(self, gateway_id, gateway_device_id):
 		with self._lock:
 			c = self._cursor
@@ -81,33 +80,30 @@ class SgPersistence(object):
 		# get non-overlapping ids (which isn't strictly necessary but seems like good practice)
 		return self.get_device_id(AREA_MAGIC_GATEWAY_ID, area_id)
 
-	def record_startup(self, gateway_id, gateway_device_id, level):
+	def record_startup(self, dev_id, level):
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			current_ts = datetime.datetime.now().isoformat()
 			c.execute('INSERT INTO device_events(sg_device_id, event_code, level, event_ts) VALUES(?,?,?,?)',
 				(dev_id, EventCode.RESTART, level, current_ts))
 			self._commit()
 
-	def record_change(self, gateway_id, gateway_device_id, level):
+	def record_change(self, dev_id, level):
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			self._save_newest_knowledge(dev_id, EventCode.CHANGED, level)
 			self._commit()
 
-	def get_delta_since_change(self, gateway_id, gateway_device_id):
+	def get_delta_since_change(self, dev_id):
 		# get time (in seconds) since device registered a change, or None if not known (not since startup)
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			# get newest event for device, ignoring checkpoint events.
 			c.execute('SELECT event_ts, event_code FROM device_events WHERE sg_device_id = ? AND event_code <> ? ORDER BY event_ts DESC LIMIT 1',
 				(dev_id, EventCode.CHECKPOINT))
 			row = c.fetchone()
 			if row is None:
-				logger.warn('No events for device %s:%s' % (gateway_id, gateway_device_id))
+				logger.warn('No events for device %s' % dev_id)
 				return None
 			# if newest is a change event, we can calculate delta. If it's a restart event, we cannot.
 			if row['event_code'] == EventCode.CHANGED:
@@ -116,21 +112,19 @@ class SgPersistence(object):
 			else:
 				return None
 
-	def get_action_count(self, gateway_id, gateway_device_id, age_limit = None):
+	def get_action_count(self, dev_id, age_limit = None):
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			start_time = (datetime.datetime.now() - age_limit).isoformat() if age_limit is not None else '0'
 			c.execute('SELECT COUNT(*) FROM device_events WHERE sg_device_id = ? AND event_code = ? AND event_ts > ?',
 				(dev_id, EventCode.CHANGED, start_time))
 			return c.fetchone()[0]
 
-	def get_time_in_state(self, gateway_id, gateway_device_id, state):
+	def get_time_in_state(self, dev_id, state):
 		# state: boolean (anything evaluating true for on, false for off)
 		delta = datetime.timedelta()
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			# Iterate entire device history, looking at transitions where we know the state on both sides
 			# That is, from (changed or restart) to (changed or checkpoint).
 			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts ASC', (dev_id, ))
@@ -153,10 +147,9 @@ class SgPersistence(object):
 
 		return delta
 
-	def get_recent_events(self, gateway_id, gateway_device_id, count = 10):
+	def get_recent_events(self, dev_id, count = 10):
 		with self._lock:
 			c = self._cursor
-			dev_id = self.get_device_id(gateway_id, gateway_device_id)
 			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts DESC LIMIT ?', (dev_id, count))
 			rows = c.fetchall()
 			# XXX how to represent this... for now, just text for debug dump
