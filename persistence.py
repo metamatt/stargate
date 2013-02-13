@@ -130,7 +130,7 @@ class SgPersistence(object):
 			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts ASC', (dev_id, ))
 			prev_code = None
 			prev_ts = None
-			for row in c.fetchall():
+			for row in c:
 				cur_code = row['event_code']
 				cur_ts = self._ts_from_string(row['event_ts'])
 				if prev_code == EventCode.CHANGED or prev_code == EventCode.RESTART:
@@ -147,13 +147,45 @@ class SgPersistence(object):
 
 		return delta
 
-	def get_recent_events(self, dev_id, count = 10):
+	def get_recent_events(self, dev_id, count = 10, include_synthetic = False):
+		# dev_id can be a single device id, or a list of device ids
+		# we look only at CHANGED events unless include_synthetic is true, in which case we look at all events
+		eligible_events = '1,2,3' if include_synthetic else str(EventCode.CHANGED)
 		with self._lock:
 			c = self._cursor
-			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts DESC LIMIT ?', (dev_id, count))
-			rows = c.fetchall()
-			# XXX how to represent this... for now, just text for debug dump
-			return [(EventCode.from_int(r['event_code']), r['level'], r['event_ts']) for r in rows]
+			if isinstance(dev_id, list):
+				# XXX I have to do my own string formatting here to use IN (a,b,c) because sqlite3 won't let me pass a list,
+				# or even a string full of commas, as a ? replacement. This isn't perfect, but clobbering to int, then to
+				# string to join by comma, then concatenating into the SQL command string should be safe.
+				ids_as_string = ','.join([str(int(did)) for did in dev_id])
+				c.execute('SELECT sg_device_id, event_ts, event_code, level FROM device_events ' +
+					'WHERE sg_device_id IN (' + ids_as_string + ') AND event_code IN (?) ORDER BY event_ts DESC LIMIT ?',
+					(eligible_events, count))
+			else:
+				c.execute('SELECT sg_device_id, event_ts, event_code, level FROM device_events ' +
+					'WHERE sg_device_id = ? AND event_code IN (?) ORDER BY event_ts DESC LIMIT ?',
+					(dev_id, eligible_events, count))
+
+			# XXX string formatting code doesn't belong here
+			# XXX and I want access to demo.human_readable_timedelta()
+			events = []
+			for row in c:
+				if row['event_code'] == EventCode.CHANGED:
+					desc = 'Change level to ' + str(row['level']) + ' at '
+				elif row['event_code'] == EventCode.CHECKPOINT:
+					desc = 'Checkpoint state as level ' + str(row['level']) + ' at '
+				else: # row['event_code'] == EventCode.RESTART:
+					desc = 'Stargate restart at '
+				ts = row['event_ts']
+				def time_ago(ts):
+					then = dateutil.parser.parse(ts)
+					now = datetime.datetime.now()
+					delta = now - then
+					return str(delta)
+				desc = desc + ts + " (%s ago)" % time_ago(ts)
+				events.append({ 'source_did': row['sg_device_id'], 'desc': desc })
+				# event = (EventCode.from_int(row['event_code']), row['level'], row['event_ts'])
+			return events
 
 	# private helpers
 	def _level_matches_state(self, level, state):
@@ -163,7 +195,7 @@ class SgPersistence(object):
 		with self._lock:
 			c = self._cursor
 			c.execute('SELECT sg_device_id FROM device_map WHERE gateway_id <> ?', (AREA_MAGIC_GATEWAY_ID,))
-			for row in c.fetchall():
+			for row in c:
 				dev_id = row[0]
 				self._checkpoint_device_state(dev_id)
 			self._commit()

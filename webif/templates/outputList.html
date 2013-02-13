@@ -45,4 +45,14 @@
 	</ul>
 {% endfor %}
 
+<hr>
+<font size="-1">
+<p>Recent events:<ul>
+	{% for ev in house.get_recent_events(devices, 50) %}
+	{% set device = house.get_device_by_id(ev['source_did']) %}
+		<li><a href="{{ url_for('get_' + device.devclass, dev_id = device.device_id) }}">{{ device.name }}</a>: {{ ev['desc'] }}</li>
+	{% endfor %}
+</ul></p>
+</font>
+
 {% endblock content %}

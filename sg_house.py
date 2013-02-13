@@ -184,6 +184,10 @@ class StargateArea(object):
 		if area != self: # special case for the house which is its own parent
 			self.areas.append(area)
 		return self.house._register_area(area)
+
+	def get_recent_events(self, count = 10):
+		dev_ids = [dev.device_id for dev in self._get_all_devices_below()]
+		return self.house.persist.get_recent_events(dev_ids, count)
 	
 	# Area/Device/House relation:
 	# The house is a tree with devices as leaves and areas as internal nodes (the root node is the house, which is also an area).
@@ -365,6 +369,10 @@ class StargateHouse(StargateArea):
 		order.append('all')
 		# order the input list by the criteria we just built
 		return [t for t in order if t in types]
+
+	def get_recent_events(self, devices, count = 10):
+		dev_ids = [dev.device_id for dev in devices]
+		return self.persist.get_recent_events(dev_ids, count)
 
 
 class StargateGateway(object):
