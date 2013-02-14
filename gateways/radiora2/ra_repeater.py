@@ -11,10 +11,11 @@
 import logging
 import Queue
 import re
-import select
 import socket
 import time
 import threading
+
+import connections
 
 
 logger = logging.getLogger(__name__)
@@ -142,69 +143,6 @@ class OutputCache(object):
 			subscriber.on_user_action(iid, state, refresh, comp_id)
 
 
-class CrlfSocketBuffer(object):
-	def __init__(self, socket):
-		self.socket = socket
-		self.leftovers = ''
-	
-	def read_lines(self):
-		new_data = self.socket.recv(1024)
-		if len(new_data) == 0:
-			raise Exception('read on closed socket')
-		data = self.leftovers + new_data
-		lines = data.split('\r\n')
-		self.leftovers = lines.pop()
-		return lines
-
-
-class ListenerThread(threading.Thread):
-	def __init__(self, repeater):
-		super(ListenerThread, self).__init__(name = 'ra_repeater')
-		self.daemon = True
-		self.repeater = repeater
-		self.logger = logging.getLogger(__name__ + '.listener')
-		self.logger.info('%s: init for listener with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
-
-	def run(self):
-		try:
-			socket = self.repeater.socket
-			buffer = CrlfSocketBuffer(socket)
-			while True:
-				self.logger.debug('sleep')
-				(readable, writable, errored) = select.select([socket], [], [socket])
-				if len(errored):
-					raise Exception('socket in error state')
-				assert readable == [socket]
-				self.logger.debug('wake for input')
-				for line in buffer.read_lines():
-					self.repeater.receive_repeater_reply(line)
-		except:
-			self.logger.exception('DSC panel listener died')
-			# exit and let watchdog restart us
-
-
-class SenderThread(threading.Thread):
-	def __init__(self, repeater):
-		super(SenderThread, self).__init__(name = 'ra_sender')
-		self.repeater = repeater
-		self.daemon = True
-		self.logger = logging.getLogger(__name__ + '.listener')
-		self.logger.info('%s: init for sender with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
-
-	def run(self):
-		try:
-			socket = self.repeater.socket
-			while True:
-				cmd = self.repeater.send_queue.get()
-				self.logger.debug('debug: dequeue and send command: ' + cmd)
-				sent = socket.send(cmd + '\r\n')
-				if sent != len(cmd) + 2:
-					logger.warning('send_repeater_command: sent %d of %d bytes' % (sent, 2 + len(cmd)))
-		except:
-			self.logger.exception('Lutron repeater sender died')
-			# exit and let watchdog restart us
-
-
 class RaRepeater(object):
 	def __init__(self):
 		self.state = None
@@ -233,10 +171,10 @@ class RaRepeater(object):
 
 		# then put socket in nonblocking mode and start reader/writer threads
 		self.socket.setblocking(0)
-		self.listen_thread = ListenerThread(self)
+		self.listen_thread = connections.ListenerThread(self, 'ra')
 		self.listen_thread.start()
 		self.send_queue = Queue.Queue()
-		self.send_thread = SenderThread(self)
+		self.send_thread = connections.SenderThread(self, 'ra')
 		self.send_thread.start()
 
 		# finally kick off by requesting further updates
@@ -307,6 +245,9 @@ class RaRepeater(object):
 	def send_repeater_command(self, cmd):
 		logger.debug('send_repeater_command: enqueue %s' % repr(cmd))
 		self.send_queue.put(str(cmd))
+
+	def receive_from_listener(self, cmd):
+		self.receive_repeater_reply(cmd)
 
 	def receive_repeater_reply(self, line):
 		logger.debug('receive_repeater_reply: reply %s' % repr(line))

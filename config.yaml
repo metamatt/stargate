@@ -25,10 +25,11 @@ logging:
     # equal or higher level which is output to console as well as logfile
     console_level: warning
     # loglevels for plugin modules
-    level.gateways.radiora2.ra_repeater: debug
-    level.gateways.radiora2.ra_repeater.listener: info
+    level.gateways.radiora2: info
+    level.connectionThreads.ra_listener: info
     level.gateways.powerseries: debug
-    level.gateways.powerseries.dsc_panel.listener: info
+    level.connectionThreads.dsc_listener: info
+    level.gateways.vera: info
 
 # notifications
 notifications:
