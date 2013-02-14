@@ -348,9 +348,10 @@ class StargateHouse(StargateArea):
 		# iterate devclass list to build list of devtypes
 		tcs = []
 		for dc in classes:
-			for dt in self.devtype_order_by_devclass[dc]:
-				if dt is None or dt == devtype:
-					tcs.append('%s:%s' % (dc, dt))
+			if self.devtype_order_by_devclass.has_key(dc):
+				for dt in self.devtype_order_by_devclass[dc]:
+					if dt is None or dt == devtype:
+						tcs.append('%s:%s' % (dc, dt))
 		# iterate flattened class/type list to build list of devstates
 		order = []
 		for tc in tcs:
@@ -367,8 +368,9 @@ class StargateHouse(StargateArea):
 			classes = StargateDeviceFilter.DEVICE_CLASSES
 		# iterate devclass list to build list of devtypes
 		order = []
-		for devclass in classes:
-			order.extend(self.devtype_order_by_devclass[devclass])
+		for dc in classes:
+			if self.devtype_order_by_devclass.has_key(dc):
+				order.extend(self.devtype_order_by_devclass[dc])
 		order.append('all')
 		# order the input list by the criteria we just built
 		return [t for t in order if t in types]
