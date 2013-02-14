@@ -139,7 +139,7 @@ class VeraGateway(sg_house.StargateGateway):
 
 	# private helper for change-poll-notification
 	def _install_periodic_poller(self):
-		def poll_callback(self):
+		def poll_callback():
 			# read sdata and re-forward every device its current data record
 			try:
 				sdata = self._vera_luup_request('sdata')
@@ -150,7 +150,7 @@ class VeraGateway(sg_house.StargateGateway):
 				logger.exception(ex)
 			# and reinstall this one-shot timer
 			self._install_periodic_poller()
-		self._poll_thread = threading.Timer(self.poll_interval, poll_callback, args = [self])
+		self._poll_thread = threading.Timer(self.poll_interval, poll_callback)
 		self._poll_thread.setDaemon(True)
 		self._poll_thread.setName('vera_poll_timer')
 		self._poll_thread.start()
