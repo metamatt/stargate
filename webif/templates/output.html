@@ -36,9 +36,16 @@
 		<tr><td>Total time {{ device.get_name_for_level(0) }}</td><td>{{ device.get_time_in_state(False) | human_readable_timedelta }}</td></tr>
 	</table></ul>
 	<p>Recent events:<ul>
-		{% for ev in device.get_recent_events() %}
-			<li>{{ ev | human_readable_event }}</li>
-		{% endfor %}
+		{% if device.devtype == 'keypad' %}
+			{% for ev in house.get_recent_events([device]) %}
+				{% set device = house.get_device_by_id(ev.device_id) %}
+				<li><a href="{{ url_for('get_' + device.devclass, dev_id = device.device_id) }}">{{ device.name }}</a>: {{ ev | human_readable_event }}</li>
+			{% endfor %}
+		{% else %}
+			{% for ev in device.get_recent_events() %}
+				<li>{{ ev | human_readable_event }}</li>
+			{% endfor %}
+		{% endif %}
 	</ul></p>
 </font></p>
 
