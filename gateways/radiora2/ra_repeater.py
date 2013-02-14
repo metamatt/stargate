@@ -288,12 +288,17 @@ class RaRepeater(object):
 		state = True if parameter == 1 else False
 		self.cache._record_led_state(device, component, state)
 
+	def _match_monitoring_response(self, match):
+		# we catch this just to avoid complaint about unhandled command; we don't need to do anything
+		logger.debug('match %s -> monitoring mode now %s,%s' % (match.group(), match.group(1), match.group(2)))
+
 	def _prep_response_handlers(self):
 		self.prompt_re = re.compile('^\s*GNET>\s*(.*)$')
 		self.response_handler_list = [
 			(re.compile('~OUTPUT,(\d+),1,(\d+.\d+)'), self._match_output_response),
 			(re.compile('~DEVICE,(\d+),(\d+),9,(\d)'), self._match_led_response), # XXX: depend on order, since button regex will match led action too
 			(re.compile('~DEVICE,(\d+),(\d+),(\d)'), self._match_button_response),
+			(re.compile('~MONITORING,(\d+),(\d+)'), self._match_monitoring_response),
 		]
 
 	def enable_monitoring(self):
