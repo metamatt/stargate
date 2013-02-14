@@ -20,16 +20,6 @@ import threading
 logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
-# List of repeater prompts. We define "prompt" as the repeater responses
-# that mean the repeater wants to hear from us next, and won't be followed by CRLF.
-ra_prompt_map = [
-	'GNET> \x00', # XXX I don't know why, but the first GNET response after login always has a NUL byte there
-	'\rGNET> ', # XXX note that the first GNET response is preceded by \r\n which we split on the line separator
-	# so we don't treat it as part of the response, but all further GNET responses have only \r which we don't split out
-	# and thus do see.
-]
-CRLF = '\r\n'
-
 
 class OutputCache(object):
 	# Low-level cache of last seen level for each device (output, button, led)
@@ -152,6 +142,21 @@ class OutputCache(object):
 			subscriber.on_user_action(iid, state, refresh, comp_id)
 
 
+class CrlfSocketBuffer(object):
+	def __init__(self, socket):
+		self.socket = socket
+		self.leftovers = ''
+	
+	def read_lines(self):
+		new_data = self.socket.recv(1024)
+		if len(new_data) == 0:
+			raise Exception('read on closed socket')
+		data = self.leftovers + new_data
+		lines = data.split('\r\n')
+		self.leftovers = lines.pop()
+		return lines
+
+
 class ListenerThread(threading.Thread):
 	def __init__(self, repeater):
 		super(ListenerThread, self).__init__(name = 'ra_repeater')
@@ -162,41 +167,20 @@ class ListenerThread(threading.Thread):
 
 	def run(self):
 		try:
-			sock = self.repeater.socket
-			unprocessed = ''
+			socket = self.repeater.socket
+			buffer = CrlfSocketBuffer(socket)
 			while True:
-				# Run loop:
-				# - block until socket is readable, then read whatever we can
-				# - append new data to 'unprocessed'
-				# - if 'unprocessed' contains any complete lines of input,
-				#   send them over to main thread
-				self.logger.debug('debug: listener thread block on input')
-				(readable, writable, errored) = select.select([sock], [], [sock])
-				self.logger.debug('debug: listener thread woke for input with %d/%d/%d sockets r/w/e' % (len(readable), len(writable), len(errored)))
+				self.logger.debug('sleep')
+				(readable, writable, errored) = select.select([socket], [], [socket])
 				if len(errored):
 					raise Exception('socket in error state')
-				assert readable == [sock]
-				newInput = sock.recv(1024)
-				self.logger.debug('debug: listener thread read %d bytes: %s' % (len(newInput), repr(newInput)))
-				if len(newInput) == 0:
-					raise Exception('read on closed socket')
-				# Now combine and parse pending data (new and old-unprocessed). Append new data,
-				# split into lines, and if the last line is not a known prompt, stick it back in
-				# the pending pile. (We expect all replies to eventually go back to the GNET
-				# prompt, so if we read a response that doesn't end with a prompt, we don't know
-				# whether it's complete, and we do know more data is coming, so we wait for more
-				# before deciding how to parse this.)
-				unprocessed += newInput
-				lines = unprocessed.split(CRLF)
-				unprocessed = ''
-				if lines[-1] not in ra_prompt_map:
-					unprocessed = lines.pop()
-				# Now send complete received lines of data back to main thread for processing.
-				for line in lines:
+				assert readable == [socket]
+				self.logger.debug('wake for input')
+				for line in buffer.read_lines():
 					self.repeater.receive_repeater_reply(line)
 		except:
-			logger.exception('Lutron repeater listener died')
-			# exit and let watchdog reconnect
+			self.logger.exception('DSC panel listener died')
+			# exit and let watchdog restart us
 
 
 class SenderThread(threading.Thread):
@@ -209,11 +193,11 @@ class SenderThread(threading.Thread):
 
 	def run(self):
 		try:
-			sock = self.repeater.socket
+			socket = self.repeater.socket
 			while True:
 				cmd = self.repeater.send_queue.get()
 				self.logger.debug('debug: dequeue and send command: ' + cmd)
-				sent = sock.send(cmd + CRLF)
+				sent = socket.send(cmd + '\r\n')
 				if sent != len(cmd) + 2:
 					logger.warning('send_repeater_command: sent %d of %d bytes' % (sent, 2 + len(cmd)))
 		except:
@@ -239,13 +223,13 @@ class RaRepeater(object):
 		# authenticate to repeater using simple blocking calls
 		buf = self.socket.recv(1024)
 		assert(buf == 'login: ')
-		self.socket.send(username + CRLF)
+		self.socket.send(username + '\r\n')
 		buf = self.socket.recv(1024)
 		assert(buf == 'password: ')
-		self.socket.send(password + CRLF)
+		self.socket.send(password + '\r\n')
 		buf = self.socket.recv(1024)
 		# good response: \r\nGNET> \x00; bad response: bad login\r\nlogin: \x00
-		assert(buf.startswith(CRLF + 'GNET> '))
+		assert(buf.startswith('\r\nGNET> '))
 
 		# then put socket in nonblocking mode and start reader/writer threads
 		self.socket.setblocking(0)
@@ -305,6 +289,7 @@ class RaRepeater(object):
 		self.cache._record_led_state(device, component, state)
 
 	def _prep_response_handlers(self):
+		self.prompt_re = re.compile('^\s*GNET>\s*(.*)$')
 		self.response_handler_list = [
 			(re.compile('~OUTPUT,(\d+),1,(\d+.\d+)'), self._match_output_response),
 			(re.compile('~DEVICE,(\d+),(\d+),9,(\d)'), self._match_led_response), # XXX: depend on order, since button regex will match led action too
@@ -320,19 +305,15 @@ class RaRepeater(object):
 
 	def receive_repeater_reply(self, line):
 		logger.debug('receive_repeater_reply: reply %s' % repr(line))
-		# Prompts can occur on a line by themself, or as the
-		# prefix of a line containing additional data. So we look for the prompt as a prefix,
-		# if found act on it and strip it off, then continue handling the rest of hte line.
-		for prompt in ra_prompt_map:
-			if line.startswith(prompt):
-				line = line[len(prompt):]
+		# Prompts can occur on a line by themself, or as the prefix of a line containing additional
+		# data. So we look for the prompt as a prefix, if found strip it off, then continue handling
+		# the rest of the line.
+		match = self.prompt_re.match(line)
+		if match:
+			line = match.group(1)
 
 		if len(line) > 0:
 			# Try to parse remainder as monitoring response
-			# TODO: more substantive processing of real commands
-			# - should cache value for future gets (DONE)
-			# - should handle output, led, and button (DONE)
-			# - should announce this happened for historical logging
 			for (pattern, handler) in self.response_handler_list:
 				match = pattern.match(line)
 				if match:
@@ -340,20 +321,3 @@ class RaRepeater(object):
 					break
 			if not match:
 				logger.warning('unmatched repeater reply: %s' % repr(line))
-
-	def _set_repeater_state(self, state):
-		logger.debug('debug: state now %d' % state)
-		self.state = state
-		# wake anyone waiting for this state change
-		self.stateEvent.set()
-
-	def wait_for_state(self, state):
-		logger.debug('debug: want state %d' % state)
-		while self.state != state:
-			self.stateEvent.clear()
-			if self.state == state:
-				logger.debug('debug: found requested state')
-				break
-			logger.debug('debug: wait for state change (now %d)' % self.state)
-			self.stateEvent.wait()
-		logger.debug('debug: state wait satisfied')
