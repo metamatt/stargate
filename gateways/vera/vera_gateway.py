@@ -147,7 +147,7 @@ class VeraGateway(sg_house.StargateGateway):
 					if self.devices.has_key(device.id) and self.devices[device.id]:
 						self.devices[device.id].vera_poll_update(device)
 			except Exception as ex:
-				logger.exception(ex)
+				logger.warning('Exception in vera poll: ' + str(ex))
 			# and reinstall this one-shot timer
 			self._install_periodic_poller()
 		self._poll_thread = threading.Timer(self.poll_interval, poll_callback)
