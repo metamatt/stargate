@@ -25,16 +25,16 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class DscPanelCache(object):
-	def __init__(self, panel_server, event_sink):
+	def __init__(self, event_sink):
 		self.zone_status = {}
 		self.partition_status = {}
 		self.event_sink = event_sink
-		self.panel_server = panel_server
+
+	def mark_all_stale(self):
 		for i in range(1, 65):
 			self.zone_status[i] = 'stale'
 		for i in range(1, 9):
 			self.partition_status[i] = 'stale'
-		self.panel_server.send_dsc_command(001) # request global status
 
 	def get_zone_status(self, zone_num):
 		status = self.zone_status[zone_num]
@@ -43,7 +43,7 @@ class DscPanelCache(object):
 			status = self.zone_status[zone_num]
 		return status
 
-	# DscGateway private interface
+	# DscPanelServer private interface
 	def _record_zone_status(self, zone_num, status):
 		# should be called only by DscPanelServer._receive_dsc_cmd()
 		logger.info('_record_zone_state: zone %d status %d' % (zone_num, status))
@@ -117,8 +117,9 @@ class DscPanelServer(object):
 		self.hostname = hostname
 		self.port = port
 		self.password = password
+		self.cache = DscPanelCache(gateway)
 
-	def connect(self, event_sink):
+	def connect(self):
 		# Right now, this only knows how to connect over a TCP socket
 		# and authenticate using Envisalink's protocol, so it basically
 		# assumes Envisalink. Without too many changes, we could probably
@@ -135,8 +136,9 @@ class DscPanelServer(object):
 		self.send_thread.start()
 		# log in
 		self.send_dsc_command(005, self.password)
-		# cache creation will issue the global-status command triggering many responses
-		self.cache = DscPanelCache(self, event_sink)
+		# empty the cache, and issue the global-status command to repopulate it
+		self.cache.mark_all_stale()
+		self.send_dsc_command(001)
 
 	def send_dsc_command(self, command, data_bytes = []):
 		# Can be called on any stargate thread; will send data over network socket to DSC system

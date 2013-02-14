@@ -102,7 +102,7 @@ class DscGateway(sg_house.StargateGateway):
 			self.reflector = None
 
 		# and start everything in motion
-		self.panel_server.connect(self)
+		self.panel_server.connect()
 
 	# public interface to StargateHouse
 	def get_device_by_gateway_id(self, gateway_devid):
