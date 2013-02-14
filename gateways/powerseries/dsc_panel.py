@@ -71,6 +71,8 @@ class CrlfSocketBuffer(object):
 	
 	def read_lines(self):
 		new_data = self.socket.recv(1024)
+		if len(new_data) == 0:
+			raise Exception('read on closed socket')
 		data = self.leftovers + new_data
 		lines = data.split('\r\n')
 		self.leftovers = lines.pop()
@@ -80,35 +82,48 @@ class CrlfSocketBuffer(object):
 class ListenerThread(threading.Thread):
 	def __init__(self, panel_server):
 		super(ListenerThread, self).__init__(name = 'dsc_listener')
+		self.panel_server = panel_server
 		self.daemon = True
 		self.logger = logging.getLogger(__name__ + '.listener')
-		self.logger.info('%s: init with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
-		self.panel_server = panel_server
-		self.socket = panel_server.socket
+		self.logger.info('%s: init for listener with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
 		
 	def run(self):
-		buffer = CrlfSocketBuffer(self.socket)
-		while True:
-			self.logger.debug('sleep')
-			(readable, writable, errored) = select.select([self.socket], [], [self.socket])
-			self.logger.debug('wake for input')
-			for line in buffer.read_lines():
-				self.panel_server._receive_dsc_cmd(line)
+		try:
+			socket = self.panel_server.socket
+			buffer = CrlfSocketBuffer(socket)
+			while True:
+				self.logger.debug('sleep')
+				(readable, writable, errored) = select.select([socket], [], [socket])
+				if len(errored):
+					raise Exception('socket in error state')
+				assert readable == [socket]
+				self.logger.debug('wake for input')
+				for line in buffer.read_lines():
+					self.panel_server._receive_dsc_cmd(line)
+		except:
+			self.logger.exception('DSC panel listener died')
+			# exit and let watchdog restart us
 
 
 class SenderThread(threading.Thread):
 	def __init__(self, panel_server):
 		super(SenderThread, self).__init__(name = 'dsc_sender')
-		self.daemon = True
 		self.panel_server = panel_server
-		self.socket = panel_server.socket
+		self.daemon = True
+		self.logger = logging.getLogger(__name__ + '.listener')
+		self.logger.info('%s: init for sender with level %s' % (self.logger.name, logging.getLevelName(self.logger.level)))
 
 	def run(self):
-		while True:
-			cmdline = self.panel_server.send_queue.get()
-			logger.debug('debug: dequeue and send command: ' + str(cmdline))
-			self.socket.send(str(cmdline) + '\r\n')
-			time.sleep(0.5) # XXX ugly hack
+		try:
+			socket = self.panel_server.socket
+			while True:
+				cmdline = self.panel_server.send_queue.get()
+				self.logger.debug('debug: dequeue and send command: ' + str(cmdline))
+				socket.send(str(cmdline) + '\r\n')
+				time.sleep(0.5) # XXX prevent panel from getting confused with burst of commands. the ugly way
+		except:
+			self.logger.exception('DSC panel sender died')
+			# exit and let watchdog restart us
 
 
 class DscPanelServer(object):
