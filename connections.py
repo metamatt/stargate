@@ -7,6 +7,7 @@
 
 import logging
 import select
+import socket
 import threading
 
 
@@ -22,7 +23,7 @@ class CrlfSocketBuffer(object):
 	def read_lines(self):
 		new_data = self.socket.recv(1024)
 		if len(new_data) == 0:
-			raise Exception('read on closed socket')
+			raise Exception('read on socket failed; assuming other end closed')
 		data = self.leftovers + new_data
 		lines = data.split('\r\n')
 		self.leftovers = lines.pop()
@@ -52,7 +53,8 @@ class ListenerThread(threading.Thread):
 					self.delegate.receive_from_listener(line)
 		except:
 			self.logger.exception('listener thread exiting')
-			# exit and let watchdog restart us
+			# close socket so watchdog notices; exit and let watchdog restart us
+			sock.close()
 
 
 class SenderThread(threading.Thread):
@@ -76,6 +78,73 @@ class SenderThread(threading.Thread):
 					self.delegate.separate_sends()
 		except:
 			self.logger.exception('sender thread exiting')
-			# exit and let watchdog restart us
+			# close socket so watchdog notices; exit and let watchdog restart us
+			sock.close()
 
 
+class CleanupAndRestart(threading.Thread):
+	def __init__(self, handler):
+		super(CleanupAndRestart, self).__init__(name = 'conn_reconnect')
+		self.daemon = True
+		(self.threads, self.reconnect) = handler
+
+	def run(self):
+		logger.warn('watched socket closed; waiting for %d threads' % len(self.threads))
+		for t in self.threads:
+			# XXX horrible hack to force instances of SenderThread to exit
+			if isinstance(t, SenderThread):
+				logger.debug('sending SenderThread null request to force wakeup')
+				t.delegate.send_queue.put('')
+			t.join()
+		logger.warn('threads exited; invoking reconnect handler')
+		self.reconnect()
+		logger.warn('reconnect complete')
+
+
+class SgWatchdog(threading.Thread):
+	def __init__(self):
+		super(SgWatchdog, self).__init__(name = 'conn_watcher')
+		self.daemon = True
+		self.watches = {}
+
+	def add(self, threads, socket, reconnect):
+		# XXX we should have a lock around changing/reading the watches map
+		self.watches[socket] = (threads, reconnect)
+		# XXX poke self to redo run loop noticing new add
+
+	def detect_bad_sockets(self):
+		closed = []
+		for fd in self.watches.keys():
+			try:
+				select.select([], [], [fd], 0)
+				logger.debug('fd %s (%d) is ok' % (fd, fd.fileno()))
+			except socket.error as se:
+				if se[0] == socket.EBADF:
+					logger.debug('fd %s got EBADF; pruning' % fd)
+					closed.append(fd)
+				continue
+			except:
+				logger.exception('unexpected other problem probing for closed fd')
+		return closed
+
+	def run(self):
+		while True:
+			try:
+				# if any watched socket closes, wait for associated threads to die, and invoke reconnect
+				# XXX passing a bad fd to select results in socket library throwing a EBADF exception. So how do I tell which socket did that?
+				logger.debug('sleep')
+				(readable, writable, errored) = select.select([], [], self.watches.keys(), 1) # XXX timeout to detect adds, should be event-based
+				logger.debug('wake: count r/w/e = %d/%d/%d' % (len(readable), len(writable), len(errored)))
+				logger.debug('invoking %d cleanups' % len(errored))
+				for bad in errored:
+					CleanupAndRestart(self.watches.pop(bad)).start()
+				logger.debug('done with cleanup; repeat')
+			except socket.error as se:
+				if se[0] == socket.EBADF:
+					errored = self.detect_bad_sockets()
+					logger.debug('invoking %d cleanups' % len(errored))
+					for bad in errored:
+						CleanupAndRestart(self.watches.pop(bad)).start()
+					continue
+			except:
+				logger.exception('exception in watchdog thread')

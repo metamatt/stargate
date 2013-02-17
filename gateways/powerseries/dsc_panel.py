@@ -66,8 +66,9 @@ class DscPanelCache(object):
 
 
 class DscPanelServer(object):
-	def __init__(self, gateway, hostname, port, password):
+	def __init__(self, gateway, watchdog, hostname, port, password):
 		self.gateway = gateway
+		self.watchdog = watchdog
 		self.hostname = hostname
 		self.port = port
 		self.password = password
@@ -88,6 +89,10 @@ class DscPanelServer(object):
 		self.send_queue = Queue.Queue()
 		self.send_thread = connections.SenderThread(self, 'dsc')
 		self.send_thread.start()
+
+		# enable automatic reconnect
+		self.watchdog.add([self.listen_thread, self.send_thread], self.socket, self.connect)
+
 		# log in
 		self.send_dsc_command(005, self.password)
 		# empty the cache, and issue the global-status command to repopulate it

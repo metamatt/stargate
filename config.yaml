@@ -26,10 +26,11 @@ logging:
     console_level: warning
     # loglevels for plugin modules
     level.gateways.radiora2: info
-    level.connectionThreads.ra_listener: info
     level.gateways.powerseries: debug
-    level.connectionThreads.dsc_listener: info
     level.gateways.vera: info
+    level.connectionThreads: debug
+    level.connectionThreads.ra_listener: debug
+    level.connectionThreads.dsc_listener: debug
 
 # notifications
 notifications:

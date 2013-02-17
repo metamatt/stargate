@@ -15,7 +15,7 @@ def init(house, instance_name, gateway_config):
 		layout.get_live_db(repeater_config.hostname)
 	layout.map_db()
 
-	repeater = ra_repeater.RaRepeater()
+	repeater = ra_repeater.RaRepeater(house.watchdog)
 	repeater.connect(repeater_config.hostname, repeater_config.username, repeater_config.password)
 
 	return ra_gateway.RaGateway(house, instance_name, repeater, layout)

@@ -8,6 +8,7 @@
 import datetime
 import logging
 
+import connections
 import events
 import gateways
 import notify
@@ -243,12 +244,19 @@ class StargateHouse(StargateArea):
 		self.events = events.SgEvents(self.persist)					# SgEvents instance
 		self.timer = timer.SgTimer()                                # SgTimer instance
 		self.notify = notify.SgNotify(config.notifications)         # SgNotify instance
+		self.watchdog = connections.SgWatchdog()                    # SgWatchdog instance
 		self.areas_by_name = {}										# Map from area name to area object
 		self.devices_by_id = {}										# Map from device id to device object
 		self.areas_by_id = {}										# Map from area id to area object
 		self.devtype_order_by_devclass = {}  						# Map from devclass to list of devtype values, in sort order
 		self.devstate_order_by_tc = {}       						# Map from devclass:devtype to list of devstate values, in sort order
 		super(StargateHouse, self).__init__(self, config.house.name)
+
+		# XXX should we start watchdog before or after loading gateways?
+		# XXX if gateway loading blocks (example, synther looking for dsc device status) we're dead in the water.
+		# Should probably disallow gateway loading from blocking operations; at least code synther not to do it.
+		self.watchdog.start()
+
 		# finish initalization of all my fields before calling gateway loader
 		# ...
 		# gateway loader will cause a lot of stuff to happen
@@ -256,6 +264,7 @@ class StargateHouse(StargateArea):
 		gateways.load_all(self, config.gateways)
 		if not len(self.gateways):
 			raise Exception("No gateways were loaded")
+		logger.info('Stargate is alive')
 	
 	def get_device_by_gateway_and_id(self, gateway_id, gateway_device_id):
 		gateway = self.gateways[gateway_id]

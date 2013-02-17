@@ -95,7 +95,7 @@ class DscGateway(sg_house.StargateGateway):
 			self.partitions_by_id[partition_num] = DscPartition(self, partition_num, config.partition_names[partition_num])
 
 		# set up network connections
-		self.panel_server = DscPanelServer(self, config.gateway.hostname, 4025, config.gateway.password)
+		self.panel_server = DscPanelServer(self, self.house.watchdog, config.gateway.hostname, 4025, config.gateway.password)
 		if config.gateway.has_key('reflector_port'):
 			self.reflector = Reflector(self, config.gateway.reflector_port, config.gateway.password)
 		else:

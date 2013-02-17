@@ -144,7 +144,8 @@ class OutputCache(object):
 
 
 class RaRepeater(object):
-	def __init__(self):
+	def __init__(self, watchdog):
+		self.watchdog = watchdog
 		self.state = None
 		self.cache = None
 		self._prep_response_handlers()
@@ -176,6 +177,10 @@ class RaRepeater(object):
 		self.send_queue = Queue.Queue()
 		self.send_thread = connections.SenderThread(self, 'ra')
 		self.send_thread.start()
+
+		# enable automatic reconnect
+		self.watchdog.add([self.listen_thread, self.send_thread], self.socket,
+			lambda: self.connect(hostname, username, password))
 
 		# finally kick off by requesting further updates
 		self.enable_monitoring()
