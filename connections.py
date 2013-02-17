@@ -6,6 +6,7 @@
 # long-lived stateful connections.
 
 import logging
+import os
 import select
 import socket
 import threading
@@ -109,11 +110,14 @@ class SgWatchdog(threading.Thread):
 		self.daemon = True
 		self.watches = {}
 		self.lock = threading.RLock()
+		(self.read_wake, self.write_wake) = os.pipe() # Use pipe as select-able event object
 
 	def add(self, threads, socket, reconnect):
 		with self.lock:
 			self.watches[socket] = (threads, reconnect)
-		# XXX poke self to redo run loop noticing new add
+		# poke self to redo run loop noticing new add
+		logger.debug('prod watchdog thread to recalculate watchee list')
+		os.write(self.write_wake, '1')
 
 	def run(self):
 		def detect_bad_sockets(socket_list):
@@ -141,10 +145,12 @@ class SgWatchdog(threading.Thread):
 				# by one looking for that exception.
 				with self.lock:
 					socket_list = self.watches.keys()
-				logger.debug('sleep')
+				logger.debug('sleep on %d sockets' % len(socket_list))
 				try:
-					(readable, writable, errored) = select.select([], [], socket_list, 1) # XXX timeout to detect adds, should be event-based
+					(readable, writable, errored) = select.select([self.read_wake], [], socket_list)
 					logger.debug('wake: count r/w/e = %d/%d/%d' % (len(readable), len(writable), len(errored)))
+					if len(readable):
+						os.read(self.read_wake, 1)
 				except (select.error, socket.error) as se:
 					# This is kind of weird. The first time I select() on a closed socket I get a select.error,
 					# and after that for the same socket, I get a socket.error. There's probably a reason for
@@ -158,6 +164,6 @@ class SgWatchdog(threading.Thread):
 				for bad in errored:
 					with self.lock:
 						CleanupAndRestart(self.watches.pop(bad)).start()
-				logger.debug('done with cleanup; repeat')
+				logger.debug('done with cleanup; looping')
 			except:
 				logger.exception('exception in watchdog thread')
