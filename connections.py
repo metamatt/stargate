@@ -97,6 +97,8 @@ class CleanupAndRestart(threading.Thread):
 				t.delegate.send_queue.put('')
 			t.join()
 		logger.warn('threads exited; invoking reconnect handler')
+		# XXX I haven't tested what happens if reconnect tries to connect too early, say to
+		# a hardware device that disconnected because it rebooted and isn't back up yet.
 		self.reconnect()
 		logger.warn('reconnect complete')
 
@@ -106,45 +108,56 @@ class SgWatchdog(threading.Thread):
 		super(SgWatchdog, self).__init__(name = 'conn_watcher')
 		self.daemon = True
 		self.watches = {}
+		self.lock = threading.RLock()
 
 	def add(self, threads, socket, reconnect):
-		# XXX we should have a lock around changing/reading the watches map
-		self.watches[socket] = (threads, reconnect)
+		with self.lock:
+			self.watches[socket] = (threads, reconnect)
 		# XXX poke self to redo run loop noticing new add
 
-	def detect_bad_sockets(self):
-		closed = []
-		for fd in self.watches.keys():
-			try:
-				select.select([], [], [fd], 0)
-				logger.debug('fd %s (%d) is ok' % (fd, fd.fileno()))
-			except socket.error as se:
-				if se[0] == socket.EBADF:
-					logger.debug('fd %s got EBADF; pruning' % fd)
-					closed.append(fd)
-				continue
-			except:
-				logger.exception('unexpected other problem probing for closed fd')
-		return closed
-
 	def run(self):
+		def detect_bad_sockets(socket_list):
+			closed = []
+			for fd in socket_list:
+				try:
+					try:
+						select.select([], [], [fd], 0)
+						logger.debug('fd %s is ok (fd %d)' % (fd, fd.fileno()))
+					except (select.error, socket.error) as se:
+						if se[0] == socket.EBADF:
+							logger.debug('fd %s got EBADF; pruning' % fd)
+							closed.append(fd)
+						else:
+							raise se;
+				except:
+					logger.exception('unexpected other problem probing for closed fd')
+			return closed
+
 		while True:
 			try:
-				# if any watched socket closes, wait for associated threads to die, and invoke reconnect
-				# XXX passing a bad fd to select results in socket library throwing a EBADF exception. So how do I tell which socket did that?
+				# If any watched socket closes, wait for associated threads to die, and invoke reconnect.
+				# Note that passing a bad fd to select results in socket library throwing a EBADF exception,
+				# which doesn't tell us which socket did that. In that case, I reprobe all the sockets one
+				# by one looking for that exception.
+				with self.lock:
+					socket_list = self.watches.keys()
 				logger.debug('sleep')
-				(readable, writable, errored) = select.select([], [], self.watches.keys(), 1) # XXX timeout to detect adds, should be event-based
-				logger.debug('wake: count r/w/e = %d/%d/%d' % (len(readable), len(writable), len(errored)))
+				try:
+					(readable, writable, errored) = select.select([], [], socket_list, 1) # XXX timeout to detect adds, should be event-based
+					logger.debug('wake: count r/w/e = %d/%d/%d' % (len(readable), len(writable), len(errored)))
+				except (select.error, socket.error) as se:
+					# This is kind of weird. The first time I select() on a closed socket I get a select.error,
+					# and after that for the same socket, I get a socket.error. There's probably a reason for
+					# this, but it seems confusing and fragile, and hopefully less so if I just catch whichever
+					# one happens first and treat them the same.
+					if se[0] == socket.EBADF:
+						errored = detect_bad_sockets(socket_list)
+					else:
+						raise se;
 				logger.debug('invoking %d cleanups' % len(errored))
 				for bad in errored:
-					CleanupAndRestart(self.watches.pop(bad)).start()
-				logger.debug('done with cleanup; repeat')
-			except socket.error as se:
-				if se[0] == socket.EBADF:
-					errored = self.detect_bad_sockets()
-					logger.debug('invoking %d cleanups' % len(errored))
-					for bad in errored:
+					with self.lock:
 						CleanupAndRestart(self.watches.pop(bad)).start()
-					continue
+				logger.debug('done with cleanup; repeat')
 			except:
 				logger.exception('exception in watchdog thread')

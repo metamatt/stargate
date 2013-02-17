@@ -13,7 +13,6 @@ import Queue
 import re
 import socket
 import time
-import threading
 
 import connections
 

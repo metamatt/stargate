@@ -15,7 +15,6 @@
 import logging
 import Queue
 import socket
-import threading
 import time
 
 import connections
