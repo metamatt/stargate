@@ -32,12 +32,16 @@ def load_all(sg_house, gateways_config):
 			continue
 		logger.info('loading gateway "%s"' % gateway_module_name)
 
-		# XXX: may want facility for running multiple instances of the same gateway plugin, with unique names/config?
-		gateway_instance_name = gateway_module_name # for now
-		# Construct gateway
-		gateway = gateway_module.init(sg_house, gateway_instance_name, config)
-		
-		# We maintain gateways as a map keyed by name
-		gateway_map[gateway_instance_name] = gateway
+		try:
+			# XXX: may want facility for running multiple instances of the same gateway plugin, with unique names/config?
+			gateway_instance_name = gateway_module_name # for now
+			# Construct gateway
+			gateway = gateway_module.init(sg_house, gateway_instance_name, config)
+			
+			# We maintain gateways as a map keyed by name
+			gateway_map[gateway_instance_name] = gateway
+		except Exception as ex:
+			logger.error('gateway "%s" failed to initialize and will not be loaded' % gateway_module_name)
+			logger.exception(ex)
 	
 	return gateway_map
