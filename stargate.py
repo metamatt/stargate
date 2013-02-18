@@ -7,6 +7,7 @@
 import logging
 import optparse
 import os
+import sys
 import yaml
 
 import webif.demo as webapp
@@ -28,7 +29,16 @@ if __name__ == '__main__':
 	(options, args) = p.parse_args()
 	
 	# read yaml config file
-	config_file = open(options.config)
+	try:
+		config_file = open(options.config)
+	except:
+		print 'Unable to open configuration file "%s". (%s)' % (options.config, sys.exc_info()[1])
+		print
+		print 'If you are just getting started with Stargate, perhaps you want to create a'
+		print 'new configuration in config.yaml using config-example.yaml as a template.'
+		print
+		print 'If you already have a config file, perhaps you want the --config argument.'
+		exit(-1)
 	config = AttrDict(yaml.safe_load(config_file))
 	config_file.close()
 	
