@@ -132,6 +132,7 @@ class SgPersistence(object):
 			c.execute('SELECT event_ts, event_code, level FROM device_events WHERE sg_device_id = ? ORDER BY event_ts ASC', (dev_id, ))
 			prev_code = None
 			prev_ts = None
+			prev_level = None
 			for row in c:
 				cur_code = row['event_code']
 				cur_ts = self._ts_from_string(row['event_ts'])
@@ -143,7 +144,7 @@ class SgPersistence(object):
 				prev_ts = cur_ts
 				prev_level = row['level']
 			# Account for interval from last event to now: last event should be reliable indicator of level at time, regardless of type.
-			if self._level_matches_state(prev_level, state):
+			if prev_level is not None and self._level_matches_state(prev_level, state):
 				cur_ts = datetime.datetime.now()
 				delta = delta + cur_ts - prev_ts
 
@@ -184,6 +185,7 @@ class SgPersistence(object):
 	# private helpers
 	def _level_matches_state(self, level, state):
 		return (level > 0) == (state != 0)
+
 	def _checkpoint_all(self):
 		logger.warn('database checkpoint requested')
 		with self._lock:
