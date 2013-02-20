@@ -11,6 +11,7 @@
 # BUGS:
 # - reflector is largely untested
 
+import connections
 import logging
 import socket
 import threading
@@ -35,7 +36,7 @@ class ReflectorThread(threading.Thread):
 		logger.info('reflector accepted chained connection from %s' % str(self.client_address))
 		self.connected_socket.send('5053CD\r\n') # XXX hardcoded "authentication required" introduction
 		s = self.connected_socket
-		buffer = CrlfSocketBuffer(s)
+		buffer = connections.CrlfSocketBuffer(s)
 
 		while True:
 			(readable, writable, errored) = select.select([s], [], [s])
