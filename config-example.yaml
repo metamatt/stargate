@@ -1,0 +1,243 @@
+# Configuration file for Stargate (https://github.com/metamatt/stargate).
+# Data is in YAML format (http://www.yaml.org/; http://en.wikipedia.org/wiki/YAML).
+#
+# Stargate takes an explicit-configuration approach: values listed here as "default"
+# are default only because this file specifies them by default, and must remain
+# in this file; the code won't know what to do without them.
+
+###################################
+# global configuration
+######################
+# working_dir: stargate will look relative to here for additional config files (like
+# manifest caches for gateway plugins) and for output files (like debug logfile and
+# event history database).
+working_dir: ./RUN
+
+###################################
+# database configuration
+# (used for device event history)
+#################################
+database:
+    # datafile: relative to working_dir; default is stargate.sqlite
+    datafile: stargate.sqlite
+    # checkpoint_interval: how often to track time consumed by devices that
+    # have not changed state, in seconds; default 3600 (1 hour)
+    checkpoint_interval: 3600
+
+###################################
+# logfile
+# (debug output)
+################
+logging:
+    # logfile: relative to working_dir; default is stargate-%(pid).log
+    logfile: stargate-%(pid).log
+    # level: global output level; one of (debug, info, warning, error)
+    level: debug
+    # console_level: equal or higher level which is output to console as well as logfile
+    console_level: warning
+    # loglevels for plugin modules
+    level.gateways.radiora2: info
+    level.gateways.powerseries: debug
+    level.gateways.vera: info
+    level.connectionThreads: info
+    level.connectionThreads.ra_listener: info
+    level.connectionThreads.dsc_listener: info
+
+###################################
+# notifications
+###############
+notifications:
+    # smtp_host: hostname or IP address of SMTP server
+    smtp_host: smtp.example.com
+    # smtp_sender: email address to use for From field
+    smtp_sender: you@example.com
+
+###################################
+# webserver configuration
+# (for UI and API)
+##################
+server:
+    # port: TCP port to listen on
+    port: 80
+    # public: whether to listen on all local interfaces (false means only localhost)
+    public: true
+    # webdebug: enable the Werkzeug debugger, which presents Python backtraces and
+    # allows code execution. Very handy if you're debugging the code, but a huge
+    # security risk; recommended to use this only with "public: false".
+    webdebug: false
+
+###################################
+# House and area configuration
+# (gateway plugins can map to these or add their own)
+#####################################################
+house:
+    name: My House
+    areas:
+        TODO
+
+###################################
+# gateway plugin module configuration
+# (one section for each gateway plugin to load, by name)
+########################################################
+gateways:
+    # order: process the following sections in this order, in case of
+    # dependencies where one plugin must load after another.
+    # TODO: This is an ugly hack; I should read yaml file into
+    # order-preserving dictionary.
+    order: [ radiora2, powerseries, vera, synther]
+
+    # Gateway list: configure each desired gateway module.
+    #
+    # Format of each section:
+    # gateway_name:
+    #     disabled: false # if true, skip loading this plugin
+    #     ... parameters specific to the gateway plugin ...
+    #
+    # TODO: Instead of just mentioning a gateway name as scope here, I should
+    # have these be user-defined names which specify a gateway inside, and
+    # allow the same gateway to be loaded more than once.
+    # Then in gateways which refer to devices belonging to other gateways
+    # (e.g. synther), we should have a uniform syntax for referring to
+    # (gateway, device, params).
+    #
+    # Something like:
+    # my_radiora:
+    #   type = radiora2
+    #   ... other args for radiora2 ...
+
+    # radiora2: plugin for Lutron's RadioRa2 system.
+    # RadioRa2 can control lighting, shades, and HVAC.
+    # Stargate knows about lighting and shades but not HVAC.
+    radiora2:
+        # disabled: true # optional, default false, uncomment to disable while testing
+        # repeater: network configuration for RadioRa2 repeater
+        repeater:
+            # hostname: hostname or IP address of repeater Ethernet interface.
+            hostname: radiora
+            # username: integration username assigned in Lutron configuration software.
+            # Note that the Lutron repeater will allow only one connection per username,
+            # and will allow new connections by evicting the previous one. It is
+            # suggested that you give stargate its own username/password for this reason.
+            username: lutron
+            # password: password for username assigned in Lutron configuration software.
+            password: integration
+            # cached_database: if specified, should be a copy of http://repeater/DbXmlInfo.xml.
+            # If not specified, stargate will obtain this from the repeater each time it
+            # starts up.
+            # cached_database: DbXmlInfo.xml
+
+            # layout: configuration specific to integration IDs
+            layout:
+                # ignore_keypads: list of keypad devices to ignore, by integration ID.
+                # It is useful to ignore the main repeater, which otherwise looks like
+                # a keypad with 100 phantom buttons.
+                ignore_keypads: [1]
+
+    # vera: plugin for MiCasaVerde Vera home controller.
+    # Vera has support for a plethora of device types; stargate knows only about
+    # Z-Wave deadbolts.
+    vera:
+        # disabled: true # optional, default false, uncomment to disable while testing
+        # gateway: network configuration for Vera gateway.
+        gateway:
+            # hostname: hostname or IP address of Vera device.
+            hostname: vera
+            # poll_interval: how often (in seconds) to poll Vera device for state changes.
+            poll_interval: 5 # in seconds
+
+    # powerseries: plugin for DSC PowerSeries alarm system
+    # (with integration and Ethernet interface provided by Eyez-On Envisalink).
+    powerseries:
+        # disabled: true # optional, default false, uncomment to disable while testing
+        # gateway: network configuration for Envisalink integration module
+        gateway:
+            # hostname: hostname or IP address of envisalink device.
+            hostname: envisalink
+            # password: password assigned in envisalink web interface.
+            password: user
+            # reflector_port: if set, TCP port that Stargate will listen on presenting
+            # the same TPI interface that envisalink does. The reason for this is that
+            # the envisalink allows only one client, and will not accept additional
+            # connections. If you have another device that can usefully integrate
+            # with the powerseries (such as Vera), they cannot both connect to the
+            # envisalink directly, but you can allow stargate to connect to it, enable
+            # this reflector, and then point the additional device(s) at stargate
+            # instead.
+            #
+            # 0 means disable the reflector; the envisalink port is 4025, so that
+            # makes a good choice if you want to enable it.
+            reflector_port: 0
+        # zone_names: map from zome number (1 to 64, depending on which powerseries
+        # model you have) to zone name. Only zones mentioned here will be visible
+        # to stargate.
+        zone_names:
+            # Contents here are entirely up to you, for example:
+            1: A door
+            2: A window
+            3: A motion sensor
+            # and so on.
+        # partition_names: map from partition number (1 to 4) to partition name.
+        # Only partitions mentioned here will be visible to stargate.
+        partition_names:
+            # Contents here are entirely up to you, for example:
+            1: Burglar alarm
+            2: Lighting integration
+            3: Lock integration
+        # area_mapping: map from area name (including both areas automatically
+        # created by devices that publish area names, such as Vera and RadioRa2,
+        # and manually configured areas under house.areas) to a list of zones.
+        # Zone numbers mentioned here must appear in the zone_names section above.
+        area_mapping:
+            # Contents here are entirely up to you, for example:
+            Front door: [ 1 ]
+            Kitchen: [ 2, 3, 4 ]
+            Garage: [ 5, 6 ]
+            # and so on.
+
+    # synther: a collection of hacks to allow more complicated behavior coordinating
+    # the other gateway plugins.
+    synther:
+        disabled: true # optional, default false, uncomment to disable while testing
+        # TODO: This should get generalized and cleaned up. For now, it only supports
+        # the devices pairs I need right now.
+
+        # synther:bridge: Controls a radiora2 output which is programmed but not activated from
+        # Lutron programming perspective; it will get its state from dsc_zone sensor and send
+        # toggle to dsc_cmd output XY (partition X command Y) if it changes state.
+
+        # bridges: a list of bridge configurations
+        bridges:
+            # each bridge configuration must specify the following values:
+            # radiora2: integration ID of radiora2 output to control
+            # dsc_zone: zone number of DSC zone sensor to watch
+            # dsc_cmd: 2-digit number XY representing PGM output Y on partition X.
+            - { radiora2: 2, dsc_zone: 1, dsc_cmd: 11 }
+
+        # ledbridges: a radiora2 keypad button LED which should not be assigned to anything in Lutron software.
+        # It will get its state from dsc_zone sensor. Note that we use the button ID, not the LED it, as the
+        # component ID, because RaRepeater stores buttons and LEDs together by button ID.
+        ledbridges:
+            # radiora2_keypad: integration ID of keypad device
+            # radiora2_button_cid: component ID of button on keypad
+            # dsc_zone: zone number of DSC zone sensor to watch
+            # negate: true or false; if true, light will be on when zone is closed instead of open.
+            - { radiora2_keypad: 3, radiora2_button_cid: 5, dsc_zone: 1, negate: false }
+
+        # delays: a radiora2 keypad button which will send a command to another radiora2
+        # device if pressed and held until the delay expires.
+        delays:
+            # radiora2_keypad: integration ID of keypad device
+            # radiora2_button_cid: component ID of button on keypad
+            # delay: in seconds, amount of time that must elapse for command to be sent
+            # radiora2_output: integration ID of radiora2 output to control
+            # value: value to set output to; special value "pulse" is available for CCOs.
+            - { radiora2_keypad: 3, radiora2_button_cid: 5, delay: 3, radiora2_output: 55, value: pulse }
+
+        # paranoid: send alert email if a zone is open too long. Delay is in seconds.
+        paranoid:
+            # gateway: which plugin provides device to watch
+            # device: id of device to watch, relative to that gateway, name specified in gateway-dependent form
+            # state: when device state matches this state for delay, generate notification
+            # delay: in seconds, time that must elapse in state for notification
+            # notify: email address to notify by email
+            - { gateway: powerseries, device: 'zone:1', state: open, delay: 1800, notify: foo@example.com }
