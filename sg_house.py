@@ -202,6 +202,7 @@ class StargateArea(object):
 	# Any area list can be filtered by the device class/type/state, and will return only areas containing devices matching the filter.
 	def get_areas_filtered_by(self, devfilter):
 		areas = self._get_all_areas_below()
+		areas.append(self)
 		return filter(lambda a: a._has_device_matching(devfilter), areas)
 	
 	def get_devices_filtered_by(self, devfilter):
