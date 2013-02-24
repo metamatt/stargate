@@ -13,7 +13,7 @@
 import logging
 
 import sg_house
-from dsc_panel import DscPanelServer
+from dsc_panel import DscPanelServer, PartitionStatus
 from dsc_reflector import Reflector
 
 
@@ -36,14 +36,34 @@ class DscPanel(sg_house.StargateDevice):
 class DscPartition(sg_house.StargateDevice):
 	devclass = 'control'
 	devtype = 'alarmpartition'
-	possible_states = ( 'ready', 'trouble', 'armed' )
+	possible_states = ( 'ready', 'armed', 'busy' ) # 'trouble'
 
 	def __init__(self, gateway, partition_num, name):
 		area = gateway.house # XXX for now
+		self.partition_number = partition_num
 		super(DscPartition, self).__init__(gateway.house, area, gateway, 'partition:%d' % partition_num, name)
 
-	# as a control: this should be able to arm/disarm (read and write)
-	# XXX: should be able to report ready/open status as history events
+	def get_level(self):
+		return self.gateway.get_partition_status(self.partition_number)
+		
+	def get_name_for_level(self, level):
+		if level == PartitionStatus.ARMED:
+			return 'armed'
+		if level == PartitionStatus.READY:
+			return 'ready'
+		return 'busy'
+
+	def is_armed(self):
+		return self.get_level() == PartitionStatus.ARMED
+
+	def is_ready(self):
+		return self.get_level() == PartitionStatus.READY
+
+	def is_busy(self):
+		return self.get_level() == PartitionStatus.BUSY
+
+	def on_user_action(self, level, synthetic):
+		self.house.events.on_device_state_change(self, synthetic) # state
 
 
 class DscZoneSensor(sg_house.StargateDevice):
@@ -125,6 +145,9 @@ class DscGateway(sg_house.StargateGateway):
 	def get_zone_status(self, zone_num):
 		return self.panel_server.cache.get_zone_status(zone_num)
 
+	def get_partition_status(self, partition_num):
+		return self.panel_server.cache.get_partition_status(partition_num)
+
 	def send_user_command(self, partition_num, user_cmd_num):
 		# Envisalink UI calls this "PGM", but it's really the user-command which you often map PGM outputs to listen to, but it's not actually that direct.
 		# partition_num is 1..8
@@ -135,11 +158,15 @@ class DscGateway(sg_house.StargateGateway):
 		self.panel_server.send_dsc_command(command, data)
 
 	# panel action callback
-	def on_user_action(self, dev_type, zone_id, state, refresh):
+	def on_user_action(self, dev_type, dev_id, state, refresh):
 		if dev_type == 'zone':
-			logger.debug('panel action zone %d' % zone_id)
-			if self.zones_by_id.has_key(zone_id):
-				device = self.zones_by_id[zone_id] # XXX should handle other event sources: partition, command-output
+			logger.debug('panel action zone %d' % dev_id)
+			if self.zones_by_id.has_key(dev_id):
+				device = self.zones_by_id[dev_id]
+				device.on_user_action(state, refresh)
+		elif dev_type == 'partition':
+			if self.partitions_by_id.has_key(dev_id):
+				device = self.partitions_by_id[dev_id]
 				device.on_user_action(state, refresh)
 		else:
 			logger.warn('ignoring action for %s:%s' % (dev_type, zone_id))

@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 
+class PartitionStatus(object):
+	READY = 0
+	ARMED = 1
+	BUSY = 2
+
+
 class DscPanelCache(object):
 	def __init__(self, event_sink):
 		self.zone_status = {}
@@ -41,6 +47,13 @@ class DscPanelCache(object):
 		while status == 'stale':
 			time.sleep(0.1)
 			status = self.zone_status[zone_num]
+		return status
+
+	def get_partition_status(self, partition_num):
+		status = self.partition_status[partition_num]
+		while status == 'stale':
+			time.sleep(0.1)
+			status = self.partition_status[partition_num]
 		return status
 
 	# DscPanelServer private interface
@@ -179,12 +192,17 @@ class DscPanelServer(object):
 	def _do_partition_ready(self, data):
 		partition = int(data)
 		logger.info('partition %d: ready' % partition)
-		self.cache._record_partition_status(partition, 1)
+		self.cache._record_partition_status(partition, PartitionStatus.READY)
+
+	def _do_partition_armed(self, data):
+		partition = int(data)
+		logger.info('partition %d: closed (armed)' % partition)
+		self.cache._record_partition_status(partition, PartitionStatus.ARMED)
 
 	def _do_partition_busy(self, data):
 		partition = int(data)
 		logger.info('partition %d: busy' % partition)
-		self.cache._record_partition_status(partition, 0)
+		self.cache._record_partition_status(partition, PartitionStatus.BUSY)
 
 	def _do_partition_trouble_on(self, data):
 		partition = int(data)
@@ -200,21 +218,38 @@ class DscPanelServer(object):
 		command_num = int(data[1])
 		logger.info('user command %d on partition %d' % (command_num, partition_num))
 
+	# A note on DSC integration responses, especially for partition status.
+	# The codes from 650-673 are partition status, and are mostly but not entirely
+	# queryable with the "global status" request 001, and are (mostly? entirely?) mutually
+	# exclusive. 840-841 are similar. The 70x and 75x codes would give more detail on
+	# who armed/disarmed a zone, but those aren't queryable, and I'm not seeing them happen
+	# even when the status changes. It may be necessary to handle everything in the 650-673
+	# range to avoid getting wedged on 'stale' after a global query.
 	_response_cmd_map = {
 		501: _do_invalid_cmd,
 		505: _do_login,
 		# zone status updates
-		# XXX: note 601-610 all report different things about a zone; should have broader concept of zone state
+		# XXX: note 601-610 all report different things about a zone; should have broader
+		# concept of zone state than just open/closed
 		609: _do_zone_open,
 		610: _do_zone_closed,
 		# partition status updates
-		# XXX: note 650-659 all report different things about a partition; also maybe 66x and 67x. Should have broader concept of partition state
+		# XXX: note 650-659 all report different things about a partition; also maybe 66x and 67x.
+		# Should have broader concept of partition state (figure out which of these are mutually
+		# exclusive, and note that trouble states are not mutually exclusive with other states)
+		# 650-651 and 654-660 and 670-673 are returned by global status request. 652 is not?
 		650: _do_partition_ready,
+		652: _do_partition_armed,
 		673: _do_partition_busy,
+		# partition trouble status updates
 		840: _do_partition_trouble_on,
 		841: _do_partition_trouble_off,
 		# arm/disarm (DSC terminology is partition open/closing)
-		# XXX TODO: 70x (closing), 75x (opening)
+		#700: _do_partition_arm, # 700 is "user closing" (armed by user code)
+		#701: _do_partition_arm, # 701 is "special closing" (armed without code by quick-arm, keyfob, etc)
+		#702: _do_partition_arm, # 702 is "partial closing" (armed with some zones bypassed)
+		#750: _do_partition_disarm, # 750 is "user opening" (disarmed by user code)
+		#751: _do_partition_disarm, # 751 is "special opening" (disarmed without code by keyfob, etc)
 		# command in progress
 		912: _do_user_command_invoked,
 		# XXX: do I want to consider 660 as part of this or partition status? 912 is more useful as an event notification, assuming it's supported
