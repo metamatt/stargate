@@ -125,6 +125,7 @@ class Paranoid(object):
 		logger.info('create paranoid for %s' % str(params))
 		self.synth = synthesizer
 		house = synthesizer.house
+		assert house.notify.is_configured_for(house.notify.EMAIL)
 
 		# Locate devices to operate on
 		gateway = params['gateway']

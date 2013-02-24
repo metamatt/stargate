@@ -47,10 +47,12 @@ logging:
 # notifications
 ###############
 notifications:
-    # smtp_host: hostname or IP address of SMTP server
-    smtp_host: smtp.example.com
-    # smtp_sender: email address to use for From field
-    smtp_sender: you@example.com
+    # email: section for notification by email
+    email:
+        # smtp_host: hostname or IP address of SMTP server
+        smtp_host: smtp.example.com
+        # sender: RFC 822 email address to use for From field
+        sender: you@example.com
 
 ###################################
 # webserver configuration
@@ -176,7 +178,7 @@ gateways:
             2: A window
             3: A motion sensor
             # and so on.
-        # partition_names: map from partition number (1 to 4) to partition name.
+        # partition_names: map from partition number (1 to 8) to partition name.
         # Only partitions mentioned here will be visible to stargate.
         partition_names:
             # Contents here are entirely up to you, for example:

@@ -14,10 +14,23 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class SgNotify(object):
+	# supported notification methods
+	EMAIL = 1
+
 	def __init__(self, config):
-		self.smtp_host = config.smtp_host
-		self.smtp_sender = config.smtp_sender
-		self.smtp = smtplib.SMTP(self.smtp_host)
+		self.smtp_host = None
+		self.smtp_sender = None
+		self.smtp = None
+
+		if config.has_key('email'):
+			self.smtp_host = config.email.smtp_host
+			self.smtp_sender = config.email.sender
+			self.smtp = smtplib.SMTP(self.smtp_host)
+
+	def is_configured_for(self, method):
+		if method == SgNotify.EMAIL:
+			return self.smtp_host is not None and self.smtp_sender is not None
+		return False
 
 	def email(self, recipient, message, subject = None):
 		msg = MIMEText(message)
@@ -32,4 +45,5 @@ if __name__ == '__main__':
 	import sg_util
 	config = sg_util.AttrDict(yaml.safe_load(open('config.yaml')))
 	notify = SgNotify(config['notifications'])
+	assert notify.is_configured_for(notify.EMAIL)
 	notify.email('matt@ginzton.net', 'hello from SgNotify unit test')
