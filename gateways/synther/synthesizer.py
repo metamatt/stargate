@@ -125,15 +125,16 @@ class Paranoid(object):
 		logger.info('create paranoid for %s' % str(params))
 		self.synth = synthesizer
 		house = synthesizer.house
-		assert house.notify.is_configured_for(house.notify.EMAIL)
 
 		# Locate devices to operate on
 		gateway = params['gateway']
 		dev_to_watch = house.get_device_by_gateway_and_id(gateway, params['device'])
 		delay = params['delay']
-		notify_addr = params['notify']
+		notify_alias = params['notify']
 		bad_state = params['state']
 		watched_dev_in_bad_state = getattr(dev_to_watch, 'is_' + bad_state)
+		# Check up front and fail early if someone configures paranoid without configuring notifications.
+		assert house.notify.can_notify(notify_alias)
 
 		# Watch when gateway says it changed
 		class NonlocalState(object): # to supply writable state in nonlocal scope for nested functions to follow
@@ -141,10 +142,10 @@ class Paranoid(object):
 				self.timer_token = None
 		state = NonlocalState()
 		def on_delay():
-			logger.debug('synther.paranoid: delay elapsed; send mail to ' + notify_addr)
+			logger.debug('synther.paranoid: delay elapsed; notify group alias ' + notify_alias)
 			msg = ('Watched device "%s" has been "%s" for %d seconds.\n\n' +
 			       'You will not be notified again until it changes.') % (dev_to_watch.name, bad_state, delay)
-			house.notify.email(notify_addr, msg, 'Stargate: door open warning')
+			house.notify.notify(notify_alias, msg, 'Stargate: door open warning')
 		def on_change(synthetic):
 			logger.debug('synther.paranoid: dev %s:%s changed to %s' % (gateway, dev_to_watch.name, watched_dev_in_bad_state()))
 			if watched_dev_in_bad_state():

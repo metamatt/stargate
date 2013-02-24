@@ -53,6 +53,10 @@ notifications:
         smtp_host: smtp.example.com
         # sender: RFC 822 email address to use for From field
         sender: you@example.com
+    # recipients: define aliases for groups of (method, address) pairs
+    recipients:
+        test_recip: [ ['email', 'you@example.com'] ]
+        test_2_recips: [ ['email', 'you@example.com'], ['email', 'me@example.com'] ]
 
 ###################################
 # webserver configuration
@@ -241,5 +245,5 @@ gateways:
             # device: id of device to watch, relative to that gateway, name specified in gateway-dependent form
             # state: when device state matches this state for delay, generate notification
             # delay: in seconds, time that must elapse in state for notification
-            # notify: email address to notify by email
-            - { gateway: powerseries, device: 'zone:1', state: open, delay: 1800, notify: foo@example.com }
+            # notify: group alias to notify, from notifications.recipients
+            - { gateway: powerseries, device: 'zone:1', state: open, delay: 1800, notify: test_recip }
