@@ -20,12 +20,10 @@ class SgNotify(object):
 	def __init__(self, config):
 		self.smtp_host = None
 		self.smtp_sender = None
-		self.smtp = None
 
 		if config.has_key('email'):
 			self.smtp_host = config.email.smtp_host
 			self.smtp_sender = config.email.sender
-			self.smtp = smtplib.SMTP(self.smtp_host)
 
 	def is_configured_for(self, method):
 		if method == SgNotify.EMAIL:
@@ -37,7 +35,8 @@ class SgNotify(object):
 		msg['Subject'] = subject or 'Stargate'
 		msg['From'] = self.smtp_sender
 		msg['To'] = recipient
-		self.smtp.sendmail(self.smtp_sender, recipient, msg.as_string())
+		smtp = smtplib.SMTP(self.smtp_host)
+		smtp.sendmail(self.smtp_sender, recipient, msg.as_string())
 
 
 if __name__ == '__main__':
