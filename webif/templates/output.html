@@ -17,7 +17,7 @@
 				{% if button.has_led() %}
 					{{ '( O )' if button.get_led_state() else '( . )' }}
 				{% endif %}
-				<a href="{{ url_for('get_control', dev_id = device.device_id, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).label }}</a>
+				<a href="{{ url_for('get_control', dev_id = device.device_id, button_id = button.button_cid, action = 'pulse')}}">{{ device.get_button(cid).name }}</a>
 				{{ '(pressed)' if button.get_button_state() else '' }}
 			</li>
 		{% endfor %}
@@ -39,7 +39,7 @@
 		{% if device.devtype == 'keypad' %}
 			{% for ev in house.get_recent_events([device]) %}
 				{% set device = house.get_device_by_id(ev.device_id) %}
-				<li><a href="{{ url_for('get_' + device.devclass, dev_id = device.device_id) }}">{{ device.name }}</a>: {{ ev | human_readable_event }}</li>
+				<li>Button <a href="{{ url_for('get_' + device.devclass, dev_id = device.device_id) }}">{{ device.name }}</a>: {{ ev | human_readable_event }}</li>
 			{% endfor %}
 		{% else %}
 			{% for ev in device.get_recent_events() %}

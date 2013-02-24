@@ -154,13 +154,11 @@ class KeypadButton(sg_house.StargateDevice):
 	possible_states = ('pressed', 'unpressed')
 	hide_from_enumeration = True
 
-	def __init__(self, keypad, button_cid, label, led_cid):
+	def __init__(self, keypad, button_cid, name, led_cid):
 		dev_id = '%dbtn%d' % (keypad.iid, button_cid)
-		name = 'Button %d on %s' % (button_cid, keypad.name)
 		super(KeypadButton, self).__init__(keypad.house, keypad.area, keypad.gateway, dev_id, name)
 		self.keypad = keypad
 		self.button_cid = button_cid
-		self.label = label
 		self.led_cid = led_cid
 
 	def has_led(self):
