@@ -136,25 +136,55 @@ class Paranoid(object):
 		# Check up front and fail early if someone configures paranoid without configuring notifications.
 		assert house.notify.can_notify(notify_alias)
 
-		# Watch when gateway says it changed
+		# Helpers for following on_change handler
 		class NonlocalState(object): # to supply writable state in nonlocal scope for nested functions to follow
 			def __init__(self):
 				self.timer_token = None
+				self.bad_since = None
+				self.warned_at = None
 		state = NonlocalState()
+		def send_notification(state_is_bad):
+			if state_is_bad:
+				delay_descr = '%d seconds' % delay # XXX should convert this to friendly time
+				msg = ('Watched device "%s" has been "%s" for %s.\n\n' +
+				       'Stargate will send confirmation when this problem is fixed; ' +
+				       'it will not send further warnings while it stays %s.'
+				      % (dev_to_watch.name, bad_state, delay_descr, bad_state))
+		      # XXX add "Entered bad 'open' state at <bad_since> (x units ago)"
+		      # XXX add "Warning generated at <warned_at>"
+				subject = 'Stargate: %s %s warning' % (dev_to_watch.name, bad_state)
+			else:
+				msg = ('Watched device "%s" is no longer "%s".\n\n' +
+				       'You can stop worrying.'
+				      % (dev_to_watch.name, bad_state, delay))
+		      # XXX add "Entered bad 'open' state at <bad_since> (x units ago)"
+		      # XXX add "Sent warning bad 'open' state at <warned_at> (x units ago)"
+		      # XXX add "Left bad 'open' state at <timestamp>"
+				subject = 'Stargate: %s %s fixed' % (dev_to_watch.name, bad_state)
+			house.notify.notify(notify_alias, msg, subject)
 		def on_delay():
 			logger.debug('synther.paranoid: delay elapsed; notify group alias ' + notify_alias)
-			msg = ('Watched device "%s" has been "%s" for %d seconds.\n\n' +
-			       'You will not be notified again until it changes.') % (dev_to_watch.name, bad_state, delay)
-			house.notify.notify(notify_alias, msg, 'Stargate: door open warning')
+			state.warned_at = time.clock()
+			send_notification(True)
+
+		# Watch when gateway says it changed
 		def on_change(synthetic):
 			logger.debug('synther.paranoid: dev %s:%s changed to %s' % (gateway, dev_to_watch.name, watched_dev_in_bad_state()))
 			if watched_dev_in_bad_state():
 				if state.timer_token is None:
+					state.bad_since = time.clock()
 					state.timer_token = house.timer.add_event(delay, on_delay)
 			else:
+				# Device in good state. Remove any pending alarm, and if we already triggered
+				# the alarm and sent a badness notification, follow it with a goodness notification.
 				if state.timer_token is not None:
 					house.timer.cancel_event(state.timer_token)
 					state.timer_token = None
+				if state.warned_at is not None:
+					logger.debug('synther.paranoid: violation corrected; notify group alias ' + notify_alias)
+					send_notification(False)
+				state.bad_since = None
+				state.warned_at = None
 		house.events.subscribe(dev_to_watch, on_change)
 		# Call once now so if it's open, we start counting
 		on_change(True)
