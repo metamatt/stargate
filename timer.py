@@ -62,6 +62,7 @@ class SgTimer(object):
 				# When we wake up, for either reason, look for stuff whose time has come, invoke it, then
 				# repeat. It's ok if we wake up too early and nothing is ready.
 				while True:
+					timer.timers_changed.clear();
 					delay = self.timer.time_until_next_event()
 					timer.timers_changed.wait(delay)
 					timer.invoke_ready()
