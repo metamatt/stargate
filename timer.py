@@ -18,7 +18,7 @@ class SgTimer(object):
 	class TimerEvent(object):
 		next_token = 1 # will only be changed from inside SgTimer.add_event() while locked, so no worry about races
 		def __init__(self, delay, handler):
-			self.when = time.clock() + delay
+			self.when = time.time() + delay
 			self.handler = handler
 			self.token = SgTimer.TimerEvent.next_token
 			SgTimer.TimerEvent.next_token = SgTimer.TimerEvent.next_token + 1
@@ -81,16 +81,16 @@ class SgTimer(object):
 			if earliest is None:
 				delay = None
 			else:
-				delay = event.when - time.clock()
+				delay = event.when - time.time()
 				if (delay < 0):
-					logger.warning('detected expired event in queue: when=%g now=%g' % (event.when, time.clock()))
+					logger.warning('detected expired event in queue: when=%g now=%g' % (event.when, time.time()))
 					delay = 0
 		return delay
 
 	def invoke_ready(self):
 		# Calculation of which handlers are ready runs with the timer queue locked.
 		with self.timer_lock:
-			now = time.clock()
+			now = time.time()
 			ready = [event.handler for event in self.timers if event.when <= now]
 			self.timers = [event for event in self.timers if event.when > now]
 		# Invocation of the handlers that are ready runs without the lock.
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 	logger.setLevel(logging.DEBUG)
 	t = SgTimer()
 	def handler(delay):
-		print 'I am the %g-sec handler. The time is now %g.' % (delay, time.clock())
+		print 'I am the %g-sec handler. The time is now %g.' % (delay, time.time())
 	tokens = {}
 	for delay in [1, 2, 3, 5, 6.5, 6.66, 9]:
 		tokens[delay] = t.add_event(delay, lambda delay = delay: handler(delay))

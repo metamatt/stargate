@@ -164,7 +164,7 @@ class Paranoid(object):
 			house.notify.notify(notify_alias, msg, subject)
 		def on_delay():
 			logger.debug('synther.paranoid: delay elapsed; notify group alias ' + notify_alias)
-			state.warned_at = time.clock()
+			state.warned_at = time.time()
 			send_notification(True)
 
 		# Watch when gateway says it changed
@@ -172,7 +172,7 @@ class Paranoid(object):
 			logger.debug('synther.paranoid: dev %s:%s changed to %s' % (gateway, dev_to_watch.name, watched_dev_in_bad_state()))
 			if watched_dev_in_bad_state():
 				if state.timer_token is None:
-					state.bad_since = time.clock()
+					state.bad_since = time.time()
 					state.timer_token = house.timer.add_event(delay, on_delay)
 			else:
 				# Device in good state. Remove any pending alarm, and if we already triggered
