@@ -108,6 +108,9 @@ class DscGateway(sg_house.StargateGateway):
 		# zones
 		self.zones_by_id = {}
 		for zone_num in config.zone_names:
+			if zone_num not in areas_by_zone:
+				logger.warn('DSC zone %d not mapped to any area; using "unknown" as default' % zone_num)
+				areas_by_zone[zone_num] = house.get_area_by_name('(Unknown)')
 			self.zones_by_id[zone_num] = DscZoneSensor(self, areas_by_zone[zone_num], zone_num, config.zone_names[zone_num])
 		# partitions
 		self.partitions_by_id = {}
