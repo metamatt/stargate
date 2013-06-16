@@ -182,7 +182,10 @@ class Paranoid(object):
 					state.timer_token = None
 				if state.warned_at is not None:
 					logger.debug('synther.paranoid: violation corrected; notify group alias ' + notify_alias)
-					send_notification(False)
+					try:
+						send_notification(False)
+					except:
+						logger.exception('paranoid: tried and failed to send notification')
 				state.bad_since = None
 				state.warned_at = None
 		house.events.subscribe(dev_to_watch, on_change)
