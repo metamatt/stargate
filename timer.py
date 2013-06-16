@@ -24,7 +24,7 @@ class SgTimer(object):
 			SgTimer.TimerEvent.next_token = SgTimer.TimerEvent.next_token + 1
 
 		def __str__(self):
-			return '(Event: at %g, token %d)' % (self.when, self.token)
+			return '(Event: at %s, token %d)' % (time.ctime(self.when), self.token)
 
 	def __init__(self):
 		self.timers = [] # List of TimerEvent objects outstanding
