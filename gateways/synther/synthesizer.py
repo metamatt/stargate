@@ -146,17 +146,17 @@ class Paranoid(object):
 		def send_notification(state_is_bad):
 			if state_is_bad:
 				delay_descr = '%d seconds' % delay # XXX should convert this to friendly time
-				msg = ('Watched device "%s" has been "%s" for %s.\n\n' +
-				       'Stargate will send confirmation when this problem is fixed; ' +
-				       'it will not send further warnings while it stays %s.'
-				      % (dev_to_watch.name, bad_state, delay_descr, bad_state))
+				msg = (('Watched device "%s" has been "%s" for %s.\n\n' +
+					'Stargate will send confirmation when this problem is fixed; ' +
+					'it will not send further warnings while it stays %s.')
+				       % (dev_to_watch.name, bad_state, delay_descr, bad_state))
 				# XXX add "Entered bad 'open' state at <bad_since> (x units ago)"
 				# XXX add "Warning generated at <warned_at>"
 				subject = 'Stargate: %s %s warning' % (dev_to_watch.name, bad_state)
 			else:
-				msg = ('Watched device "%s" is no longer "%s".\n\n' +
-				       'You can stop worrying.'
-				      % (dev_to_watch.name, bad_state, delay))
+				msg = (('Watched device "%s" is no longer "%s".\n\n' +
+				       'You can stop worrying.')
+				      % (dev_to_watch.name, bad_state))
 				# XXX add "Entered bad 'open' state at <bad_since> (x units ago)"
 				# XXX add "Sent warning bad 'open' state at <warned_at> (x units ago)"
 				# XXX add "Left bad 'open' state at <timestamp>"
