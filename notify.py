@@ -3,6 +3,9 @@
 # Control of various home automation gateways.
 #
 # This module provides external notifications by email.
+#
+# BUGS: the smtplib calls in SgNotify.email() should be asynchronous,
+# and not tie up the calling thread if smtplib takes a long time.
 
 import logging
 import smtplib
@@ -25,6 +28,8 @@ class SgNotify(object):
 		if config.has_key('email'):
 			self.smtp_host = config.email.smtp_host
 			self.smtp_sender = config.email.sender
+			self.smtp_ssl = config.email.get('use_ssl', False)
+			self.smtp_auth = config.email.get('authenticate', None)
 
 	def notify(self, alias, message, subject = None):
 		if not self.aliases.has_key(alias):
@@ -56,7 +61,12 @@ class SgNotify(object):
 		msg['Subject'] = subject or 'Stargate'
 		msg['From'] = self.smtp_sender
 		msg['To'] = recipient
-		smtp = smtplib.SMTP(self.smtp_host)
+		if self.smtp_ssl:
+			smtp = smtplib.SMTP_SSL(self.smtp_host)
+		else:
+			smtp = smtplib.SMTP(self.smtp_host)
+		if self.smtp_auth:
+			smtp.login(self.smtp_auth['username'], self.smtp_auth['password'])
 		smtp.sendmail(self.smtp_sender, recipient, msg.as_string())
 
 
