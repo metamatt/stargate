@@ -5,6 +5,12 @@
 import synthesizer
 
 def init(house, instance_name, gateway_config):
+	bridges = gateway_config.get('bridges', [])
+	ledbridges = gateway_config.get('ledbridges', [])
+	delays = gateway_config.get('delays', [])
+	paranoid = gateway_config.get('paranoid', [])
 	return synthesizer.Synthesizer(house, instance_name,
-		gateway_config.bridges, gateway_config.ledbridges,
-		gateway_config.delays, gateway_config.paranoid)
+		gateway_config.get('bridges', []),
+		gateway_config.get('ledbridges', []),
+		gateway_config.get('delays', []),
+		gateway_config.get('paranoid', []))
