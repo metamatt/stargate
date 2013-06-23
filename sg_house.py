@@ -95,6 +95,9 @@ class StargateDevice(object):
 		# register with parent, which also registers with the house (which maintains a house-global lookup table on the unique/stable/int id it gets from the db)
 		self.device_id = area.register_device(self)
 	
+	def get_internal_name(self):
+		return '%s:%s' % (self.gateway.gateway_id, self.gateway_devid)
+
 	def matches_filter(self, devfilter):
 		if devfilter.devclass is not None and devfilter.devclass != self.devclass:
 			return False

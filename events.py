@@ -35,8 +35,7 @@ class SgEvents(object):
 	# into persist and get back a sg_devid which they then use here and as the public interface to the
 	# rest of persist?
 	def on_device_state_change(self, device, synthetic = False):
-		gateway_id = device.gateway.gateway_id
-		gateway_device_id = device.gateway_devid
+		dev_debug_id = device.get_internal_name()
 		device_id = device.device_id
 		level = device.get_level()
 
@@ -45,8 +44,8 @@ class SgEvents(object):
 
 		# forward all events to persist
 		if synthetic:
-			logger.info('device %s:%s reports state currently %s (synthetic, no change)' % (gateway_id, gateway_device_id, level))
+			logger.info('device %s reports state currently %s (synthetic, no change)' % (dev_debug_id, level))
 			self.persist.record_startup(device_id, level)
 		else:
-			logger.info('device %s:%s reports state change to %s' % (gateway_id, gateway_device_id, level))
+			logger.info('device %s reports state change to %s' % (dev_debug_id, level))
 			self.persist.record_change(device_id, level)
