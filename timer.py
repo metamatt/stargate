@@ -44,9 +44,14 @@ class SgTimer(object):
 		return event.token
 
 	def cancel_event(self, token):
+		removed = [];
 		with self.timer_lock:
+			removed = filter(lambda event: event.token == token, self.timers)
 			self.timers = filter(lambda event: event.token != token, self.timers)
 			self.timers_changed.set()
+		for event in removed:
+			logger.debug('removed event %s' % event)
+		logger.debug('%d events now in queue' % len(self.timers))
 
 	# worker thread
 	def run_thread(self):
@@ -100,6 +105,8 @@ class SgTimer(object):
 			except:
 				logger.error('exception in timer event handler')
 				logger.error(traceback.format_exc())
+		if ready: # if we did anything
+			logger.debug('%d events now in queue' % len(self.timers))
 
 
 if __name__ == '__main__':
