@@ -52,7 +52,16 @@ notifications:
         # smtp_host: hostname or IP address of SMTP server
         smtp_host: smtp.example.com
         # sender: RFC 822 email address to use for From field
+        #         If you need to use literal quote characters ("") in the RFC 822 address, surround
+        #         the whole thing in single quote characters ('') to keep YAML happy. For example:
+        #         sender: '"Stargate@YourHouse" <house+stargate@example.com>'
         sender: you@example.com
+        # use_ssl: set to true if your SMTP server allows/prefers/requires SSMTP (default port 465 with, 22 without)
+        use_ssl: true
+        # authenticate: configure below here if your SMTP server requires authentication
+        #authenticate:
+        #        username:
+        #        password:
     # recipients: define aliases for groups of (method, address) pairs
     recipients:
         test_recip: [ ['email', 'you@example.com'] ]
