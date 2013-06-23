@@ -13,8 +13,8 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 class SgEvents(object):
 	def __init__(self, persist):
-		# XXX this should have a subscriber list and forward that way, without hardcoded
-		# references to self.persist
+		# XXX persist should subscribe via the normal subscriber list, instead of
+		# us having this hardcoded dependency here
 		self.persist = persist
 		self.subscribers = {}
 
@@ -41,13 +41,11 @@ class SgEvents(object):
 		device_id = device.device_id
 		level = device.get_level()
 
+		suffix = synthetic and ' (synthetic, no change)' or ''
+		logger.info('device %s reports state currently %s%s' % (dev_debug_id, level, suffix))
+
 		# call registered handlers interested in this specific device
 		self.notify_subscribers(device, synthetic)
 
 		# forward all events to persist
-		if synthetic:
-			logger.info('device %s reports state currently %s (synthetic, no change)' % (dev_debug_id, level))
-			self.persist.record_startup(device_id, level)
-		else:
-			logger.info('device %s reports state change to %s' % (dev_debug_id, level))
-			self.persist.record_change(device_id, level)
+		self.persist.record_startup(device_id, level)
