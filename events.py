@@ -24,10 +24,12 @@ class SgEvents(object):
 			self.subscribers[device] = []
 		handlers = self.subscribers[device]
 		handlers.append(handler)
+		logger.info('device %s now has %d handlers' % (device.get_internal_name(), len(handlers)))
 
 	def notify_subscribers(self, device, synthetic):
 		if self.subscribers.has_key(device):
 			handlers = self.subscribers[device]
+			logger.info('device %s invoking %d handlers' % (device.get_internal_name(), len(handlers)))
 			for handler in handlers:
 				handler(synthetic)
 
