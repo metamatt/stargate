@@ -74,11 +74,15 @@ if __name__ == '__main__':
 	import yaml
 	import sg_util
 	config = sg_util.AttrDict(yaml.safe_load(open('config.yaml')))
-	notify = SgNotify(config['notifications'])
+	notifyConfig = config.notifications
+	notify = SgNotify(notifyConfig)
+	sender = notifyConfig.email.sender
 
-	# test email api directly
+	print 'Notify test: using sender address %s' % sender
+
+	# test email api directly (using the configured sender as recipient)
 	assert notify.is_configured_for(notify.EMAIL)
-	notify.email('matt@ginzton.net', 'hello from SgNotify unit test')
+	notify.email(sender, 'hello from SgNotify unit test')
 
 	# test general api (assuming config.yaml has this alias)
 	assert notify.can_notify('mv')
