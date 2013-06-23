@@ -97,7 +97,7 @@ class Delay(object):
 				self.timer_token = None
 		state = NonlocalState(ra_button.get_button_state())
 		def on_delay():
-			logger.debug('synther.delay: delay elapsed; set dev %d to %s' % (ra_keypad.iid, value))
+			logger.debug('synther.delay: delay elapsed; set dev %s to %s' % (ra_output.get_internal_name(), value))
 			if value == 'pulse':
 				ra_output.pulse_output()
 			else:
@@ -117,7 +117,7 @@ class Delay(object):
 					state.timer_token = None
 			state.pressed = pressed
 			# If timer callback elapses while still pressed: take action
-		house.events.subscribe(ra_keypad, on_lutron_push)
+		house.events.subscribe(ra_button, on_lutron_push)
 
 
 class Paranoid(object):
