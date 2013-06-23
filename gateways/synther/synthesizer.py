@@ -97,6 +97,12 @@ class Delay(object):
 				self.timer_token = None
 		state = NonlocalState(ra_button.get_button_state())
 		def on_delay():
+			if not state.pressed:
+				logger.warn('synther.delay: inconsistent internal state')
+				return
+			if not ra_button.get_button_state():
+				logger.warn('synther.delay: inconsistent external state (missed event?)')
+				return
 			logger.debug('synther.delay: delay elapsed; set dev %s to %s' % (ra_output.get_internal_name(), value))
 			if value == 'pulse':
 				ra_output.pulse_output()
