@@ -95,12 +95,6 @@ house:
 # (one section for each gateway plugin to load, by name)
 ########################################################
 gateways:
-    # order: process the following sections in this order, in case of
-    # dependencies where one plugin must load after another.
-    # TODO: This is an ugly hack; I should read yaml file into
-    # order-preserving dictionary.
-    order: [ radiora2, powerseries, vera, synther]
-
     # Gateway list: configure each desired gateway module.
     #
     # Format of each section:

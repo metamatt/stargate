@@ -4,6 +4,9 @@
 
 import vera_gateway
 
+def get_dependencies(gateway_config):
+	return set()
+
 def init(house, instance_name, gateway_config):
 	hostname = gateway_config.gateway.hostname
 	poll_interval = gateway_config.gateway.poll_interval

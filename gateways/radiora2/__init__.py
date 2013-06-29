@@ -6,6 +6,9 @@ import ra_gateway
 import ra_layout
 import ra_repeater
 
+def get_dependencies(gateway_config):
+	return set()
+
 def init(house, instance_name, gateway_config):
 	repeater_config = gateway_config.repeater
 	layout = ra_layout.RaLayout(ignore_devices = repeater_config.layout.ignore_keypads)

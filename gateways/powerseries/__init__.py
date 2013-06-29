@@ -4,5 +4,8 @@
 
 import dsc_gateway
 
+def get_dependencies(gateway_config):
+	return set()
+
 def init(house, instance_name, gateway_config):
 	return dsc_gateway.DscGateway(house, instance_name, gateway_config)

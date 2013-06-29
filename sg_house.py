@@ -264,7 +264,7 @@ class StargateHouse(StargateArea):
 		# finish initalization of all my fields before calling gateway loader
 		# ...
 		# gateway loader will cause a lot of stuff to happen
-		# including overwriting our self.gateways
+		# including populating self.gateways in this object
 		gateways.load_all(self, config.gateways)
 		if not len(self.gateways):
 			raise Exception("No gateways were loaded")
