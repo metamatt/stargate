@@ -287,6 +287,7 @@ class SgPersistence(object):
 		raise Exception('db upgrade not implemented')
 
 	def _install_signal_handlers(self):
+		# XXX this should move somewhere more global, not part of persistence
 		def handle_signal(signum, stack_frame):
 			logger.warn("Received signal %d" % signum)
 			self._checkpoint_all()
@@ -298,8 +299,16 @@ class SgPersistence(object):
 		signal.signal(signal.SIGINT, handle_signal)
 		signal.signal(signal.SIGTERM, handle_signal)
 		signal.signal(signal.SIGQUIT, handle_signal)
-		# XXX I'd like this to trigger for werkzeug's reloader, but don't know how to catch that
-	
+
+		# XXX I also want to catch exits due to werkzeug's reloader, which just calls sys.exit(3) directly.
+		# So wrap sys.exit:
+		real_sys_exit = sys.exit
+		def persist_exit_wrapper(exitcode = 0):
+			logger.warn("Checkpoint before exit")
+			self._checkpoint_all()
+			real_sys_exit(exitcode)
+		sys.exit = persist_exit_wrapper
+
 	def _install_periodic_checkpointer(self):
 		def checkpoint_callback(self):
 			# invoke the checkpoint
