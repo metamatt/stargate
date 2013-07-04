@@ -31,7 +31,7 @@ def get_dependencies(gateway_config):
 
 def init(house, instance_name, gateway_config):
 	return synthesizer.Synthesizer(house, instance_name,
-		gateway_config.get('bridges'),
-		gateway_config.get('ledbridges'),
-		gateway_config.get('delays'),
-		gateway_config.get('paranoid'))
+		gateway_config.get('bridges', []),
+		gateway_config.get('ledbridges', []),
+		gateway_config.get('delays', []),
+		gateway_config.get('paranoid', []))
