@@ -94,7 +94,7 @@ class ReflectorParentThread(threading.Thread):
 			logger.debug('to child %s' % str(child.client_address))
 			if child.authenticated:
 				try:
-					child.connected_socket.send(cmdLine)
+					child.connected_socket.send(cmdLine + '\r\n')
 				except:
 					logger.exception('unable to send to child %s' % str(child.client_address))
 
@@ -122,7 +122,7 @@ class Reflector(object):
 	def to_children(self, cmdline):
 		if self.reflect_thread:
 			with self.send_lock:
-				self.reflect_thread.to_children(cmdline + '\r\n')
+				self.reflect_thread.to_children(cmdline)
 				
 	def from_child(self, cmdline):
 		# Child gave command; pass along to DSC
