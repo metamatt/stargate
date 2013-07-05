@@ -68,6 +68,13 @@ notifications:
         test_2_recips: [ ['email', 'you@example.com'], ['email', 'me@example.com'] ]
 
 ###################################
+# reporting
+###########
+reporting:
+    startup: test_recip
+    shutdown: test_recip
+
+###################################
 # webserver configuration
 # (for UI and API)
 ##################
