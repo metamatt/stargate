@@ -50,7 +50,7 @@ class EventCode(object):
 
 
 class SgPersistence(object):
-	def __init__(self, dbconfig):
+	def __init__(self, dbconfig, events):
 		sg_signal.add_exit_listener(self._checkpoint_all)
 		sg_signal.add_hup_listener(self._checkpoint_all)
 		self._dbfilename = dbconfig.datafile
@@ -63,6 +63,7 @@ class SgPersistence(object):
 		self._checkpoint_interval = float(dbconfig.checkpoint_interval)
 		if self._checkpoint_interval > 0:
 			self._install_periodic_checkpointer()
+		events.subscribe_all(self.on_device_event)
 
 	# public interface
 	def get_device_id(self, gateway_id, gateway_device_id):
@@ -82,6 +83,14 @@ class SgPersistence(object):
 		# XXX: we reuse and abuse the device_map table for areas as well; that's the easiest way to
 		# get non-overlapping ids (which isn't strictly necessary but seems like good practice)
 		return self.get_device_id(AREA_MAGIC_GATEWAY_ID, area_id)
+
+	def on_device_event(self, device, synthetic):
+		dev_id = device.device_id
+		level = device.get_level()
+		if synthetic:
+			self.record_startup(dev_id, level)
+		else:
+			self.record_change(dev_id, level)
 
 	def record_startup(self, dev_id, level):
 		with self._lock:

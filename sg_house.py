@@ -244,10 +244,11 @@ class StargateHouse(StargateArea):
 		# ordering is very important here!
 		# need to be mostly complete before calling StargateArea initializer
 		self.house = self											# SgHouse instance as SgArea member (we call super.__init__ later, below)
-		self.persist = persistence.SgPersistence(config.database)	# SgPersistence instance
-		self.events = events.SgEvents(self.persist)					# SgEvents instance
+		self.events = events.SgEvents()                             # SgEvents instance
 		self.timer = timer.SgTimer()                                # SgTimer instance
 		self.notify = notify.SgNotify(config.notifications)         # SgNotify instance
+		self.persist = persistence.SgPersistence(config.database,   # SgPersistence instance
+			                                     self.events)
 		self.watchdog = connections.SgWatchdog()                    # SgWatchdog instance
 		self.areas_by_name = {}										# Map from area name to area object
 		self.devices_by_id = {}										# Map from device id to device object

@@ -12,12 +12,9 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class SgEvents(object):
-	def __init__(self, persist):
-		# XXX persist should subscribe via the normal subscriber list, instead of
-		# us having this hardcoded dependency here
-		self.persist = persist
+	def __init__(self):
 		self.subscribers = {}
-
+		self.broadcast_subscribers = []
 
 	def subscribe(self, device, handler):
 		if not self.subscribers.has_key(device):
@@ -26,6 +23,9 @@ class SgEvents(object):
 		handlers.append(handler)
 		logger.info('device %s now has %d handlers' % (device.get_internal_name(), len(handlers)))
 
+	def subscribe_all(self, handler):
+		self.broadcast_subscribers.append(handler)
+
 	def notify_subscribers(self, device, synthetic):
 		if self.subscribers.has_key(device):
 			handlers = self.subscribers[device]
@@ -33,19 +33,18 @@ class SgEvents(object):
 			for handler in handlers:
 				handler(synthetic)
 
+		for handler in self.broadcast_subscribers:
+			handler(device, synthetic)
+
 	# XXX: may want to pull init_device_state back out of events, and have devices register with that
 	# into persist and get back a sg_devid which they then use here and as the public interface to the
 	# rest of persist?
 	def on_device_state_change(self, device, synthetic = False):
 		dev_debug_id = device.get_internal_name()
-		device_id = device.device_id
 		level = device.get_level()
 
 		suffix = synthetic and ' (synthetic, no change)' or ''
 		logger.info('device %s reports state currently %s%s' % (dev_debug_id, level, suffix))
 
-		# call registered handlers interested in this specific device
+		# call registered handlers interested in this device
 		self.notify_subscribers(device, synthetic)
-
-		# forward all events to persist
-		self.persist.record_startup(device_id, level)
