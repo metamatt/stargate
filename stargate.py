@@ -12,6 +12,7 @@ import yaml
 
 import webif.demo as webapp
 from sg_house import StargateHouse
+import sg_signal
 from sg_util import AttrDict
 
 
@@ -76,8 +77,17 @@ if __name__ == '__main__':
 			module_logger = logging.getLogger(module)
 			module_loglevel = str_to_loglevel(config.logging[key])
 			module_logger.setLevel(module_loglevel)
+
+	# configure signal handling
+	# XXX should we do this here, or inside the webapp? I like the idea of installing
+	# signal handlers as early as possible, but we used to do it inside, and it turns
+	# out Werkzeug installs its own SIGTERM handler (overriding ours) which just calls
+	# sys.exit(0). Oh well, we catch that too.
+	sg_signal.init()
+
+	# game time -- open connections to gateway devices, start daemon threads, and
+	# start web interface.
 	
-	# connect and log in
 	# XXX: Werkzeug/Flask has a debugger with a reloader feature which if
 	# enabled will cause it to immediately respawn another copy of this process;
 	# the upshot is all this code runs twice and we only want it to run once.

@@ -25,12 +25,12 @@
 import datetime
 import dateutil.parser
 import logging
-import signal
 import sqlite3
 import sys
 import threading
 import time
 
+import sg_signal
 from sg_util import AttrDict
 
 
@@ -51,7 +51,8 @@ class EventCode(object):
 
 class SgPersistence(object):
 	def __init__(self, dbconfig):
-		self._install_signal_handlers()
+		sg_signal.add_exit_listener(self._checkpoint_all)
+		sg_signal.add_hup_listener(self._checkpoint_all)
 		self._dbfilename = dbconfig.datafile
 		self._conn = sqlite3.connect(self._dbfilename, check_same_thread = False)
 		self._conn.row_factory = sqlite3.Row
@@ -285,29 +286,6 @@ class SgPersistence(object):
 		if from_version > self._version:
 			raise Exception('database version is from the future! (newer than runtime version)')
 		raise Exception('db upgrade not implemented')
-
-	def _install_signal_handlers(self):
-		# XXX this should move somewhere more global, not part of persistence
-		def handle_signal(signum, stack_frame):
-			logger.warn("Received signal %d" % signum)
-			self._checkpoint_all()
-			if signum != signal.SIGHUP:
-				logger.warn("Exiting on signal %d" % signum)
-				sys.exit()
-
-		signal.signal(signal.SIGHUP, handle_signal)
-		signal.signal(signal.SIGINT, handle_signal)
-		signal.signal(signal.SIGTERM, handle_signal)
-		signal.signal(signal.SIGQUIT, handle_signal)
-
-		# XXX I also want to catch exits due to werkzeug's reloader, which just calls sys.exit(3) directly.
-		# So wrap sys.exit:
-		real_sys_exit = sys.exit
-		def persist_exit_wrapper(exitcode = 0):
-			logger.warn("Checkpoint before exit")
-			self._checkpoint_all()
-			real_sys_exit(exitcode)
-		sys.exit = persist_exit_wrapper
 
 	def _install_periodic_checkpointer(self):
 		def checkpoint_callback(self):
