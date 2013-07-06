@@ -15,13 +15,14 @@ import connections
 import logging
 import select
 import socket
-import threading
+
+import sg_threading
 
 logger = logging.getLogger(__name__)
 logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger.level)))
 
 
-class ReflectorThread(threading.Thread):
+class ReflectorThread(sg_threading.Thread):
 	def __init__(self, parent, socket, client_address):
 		super(ReflectorThread, self).__init__(name = 'dsc_reflector')
 		self.daemon = True
@@ -68,7 +69,7 @@ class ReflectorThread(threading.Thread):
 			return '5050CA' # XXX hardcoded authentication failure response
 
 
-class ReflectorParentThread(threading.Thread):
+class ReflectorParentThread(sg_threading.Thread):
 	def __init__(self, reflector):
 		super(ReflectorParentThread, self).__init__(name = 'dsc_reflector_listen')
 		self.daemon = True
@@ -116,7 +117,7 @@ class Reflector(object):
 		
 		if self.port:
 			self.reflect_thread = ReflectorParentThread(self)
-			self.send_lock = threading.RLock()
+			self.send_lock = sg_threading.RLock()
 			self.reflect_thread.start()
 			
 	def to_children(self, cmdline):

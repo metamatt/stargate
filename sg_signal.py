@@ -7,6 +7,7 @@
 import logging
 import signal
 import sys
+import threading
 
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,12 @@ def init():
 	signal.signal(signal.SIGINT, handle_exit_signal)
 	signal.signal(signal.SIGTERM, handle_exit_signal)
 	signal.signal(signal.SIGQUIT, handle_exit_signal)
+
+	# Install global exception handler.
+	def excepthook(type, value, traceback):
+		name = threading.current_thread().name
+		logger.exception('Exception in thread %s' % name)
+	sys.excepthook = excepthook
 
 
 def add_exit_listener(callback):
