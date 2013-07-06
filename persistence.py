@@ -50,9 +50,11 @@ class EventCode(object):
 
 
 class SgPersistence(object):
-	def __init__(self, dbconfig, events):
+	def __init__(self, dbconfig, sg_events, sg_timer):
 		sg_signal.add_exit_listener(self._checkpoint_all)
 		sg_signal.add_hup_listener(self._checkpoint_all)
+		self.sg_timer = sg_timer
+
 		self._dbfilename = dbconfig.datafile
 		self._conn = sqlite3.connect(self._dbfilename, check_same_thread = False)
 		self._conn.row_factory = sqlite3.Row
@@ -63,7 +65,7 @@ class SgPersistence(object):
 		self._checkpoint_interval = float(dbconfig.checkpoint_interval)
 		if self._checkpoint_interval > 0:
 			self._install_periodic_checkpointer()
-		events.subscribe_all(self.on_device_event)
+		sg_events.subscribe_all(self.on_device_event)
 
 	# public interface
 	def get_device_id(self, gateway_id, gateway_device_id):
@@ -297,15 +299,12 @@ class SgPersistence(object):
 		raise Exception('db upgrade not implemented')
 
 	def _install_periodic_checkpointer(self):
-		def checkpoint_callback(self):
+		def checkpoint_callback():
 			# invoke the checkpoint
 			self._checkpoint_all()
 			# and reinstall this one-shot timer
 			self._install_periodic_checkpointer()
-		self._checkpoint_thread = threading.Timer(self._checkpoint_interval, checkpoint_callback, args = [self])
-		self._checkpoint_thread.setDaemon(True)
-		self._checkpoint_thread.setName('db_cp_timer')
-		self._checkpoint_thread.start()
+		self.sg_timer.add_event(self._checkpoint_interval, checkpoint_callback)
 
 
 # simple unit test

@@ -14,14 +14,14 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 class SgReporter(object):
-	def __init__(self, config, timer, notify):
+	def __init__(self, config, sg_timer, sg_notify):
 		self.config = config
-		self.timer = timer
-		self.notify = notify
+		self.sg_timer = sg_timer
+		self.sg_notify = sg_notify
 
 		# send startup report
 		if self.config.startup:
-			self.notify.notify(self.config.startup, 'Stargate is now running', 'Stargate startup')
+			self.sg_notify.notify(self.config.startup, 'Stargate is now running', 'Stargate startup')
 
 		# register for shutdown events
 		sg_signal.add_exit_listener(self.atexit)
@@ -37,4 +37,4 @@ class SgReporter(object):
 	def atexit(self):
 		# send shutdown report
 		if self.config.shutdown:
-			self.notify.notify(self.config.shutdown, 'Stargate has stopped', 'Stargate shutdown')
+			self.sg_notify.notify(self.config.shutdown, 'Stargate has stopped', 'Stargate shutdown')

@@ -243,13 +243,16 @@ class StargateArea(object):
 class StargateHouse(StargateArea):
 	def __init__(self, config):
 		# ordering is very important here!
-		# need to be mostly complete before calling StargateArea initializer
+		# For one, we need to be mostly complete before calling StargateArea initializer
+		# For two, try to keep intermodule dependencies to a minimum. For now we're initializing
+		# them in dependency order, and passing the dependencies in explicitly so they don't
+		# need or get a dependency back to this house object.
 		self.house = self											# SgHouse instance as SgArea member (we call super.__init__ later, below)
 		self.events = events.SgEvents()                             # SgEvents instance
 		self.timer = timer.SgTimer()                                # SgTimer instance
 		self.notify = notify.SgNotify(config.notifications)         # SgNotify instance
 		self.persist = persistence.SgPersistence(config.database,   # SgPersistence instance
-			                                     self.events)
+			                                     self.events, self.timer)
 		self.reports = reports.SgReporter(config.reporting,         # SgReporter instance
 			                              self.timer, self.notify)
 		self.watchdog = connections.SgWatchdog()                    # SgWatchdog instance
