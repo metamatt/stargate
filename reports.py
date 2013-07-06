@@ -7,6 +7,7 @@
 
 import logging
 import sg_signal
+import traceback
 
 
 logger = logging.getLogger(__name__)
@@ -24,15 +25,20 @@ class SgReporter(object):
 			self.sg_notify.notify(self.config.startup, 'Stargate is now running', 'Stargate startup')
 
 		# register for shutdown events
-		sg_signal.add_exit_listener(self.atexit)
+		sg_signal.add_exit_listener(self.on_exit)
 
 		# register for logger.exception
-		# TODO...
+		sg_signal.add_exception_listener(self.on_exception)
 
 		# install timers for interval summaries
 		# TODO...
 
-	def atexit(self):
+	def on_exception(self):
+		if self.config.exception:
+			report = traceback.format_exc();
+			self.sg_notify.notify(self.config.exception, report, 'Stargate exception report')
+
+	def on_exit(self):
 		# send shutdown report
 		if self.config.shutdown:
 			self.sg_notify.notify(self.config.shutdown, 'Stargate has stopped', 'Stargate shutdown')

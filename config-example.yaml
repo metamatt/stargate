@@ -73,6 +73,7 @@ notifications:
 reporting:
     startup: test_recip
     shutdown: test_recip
+    exception: test_recip
 
 ###################################
 # webserver configuration
