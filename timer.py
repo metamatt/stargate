@@ -6,7 +6,6 @@
 
 import logging
 import time
-import traceback
 
 import sg_threading
 
@@ -104,8 +103,7 @@ class SgTimer(object):
 			try:
 				handler()
 			except:
-				logger.error('exception in timer event handler')
-				logger.error(traceback.format_exc())
+				logger.exception('exception in timer event handler')
 		if ready: # if we did anything
 			logger.debug('%d events now in queue' % len(self.timers))
 

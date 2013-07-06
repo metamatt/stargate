@@ -66,6 +66,4 @@ def _call_listeners(listeners):
 		try:
 			callback()
 		except:
-			pass
-
-
+			logger.error('Exception during signal handler; ignored')

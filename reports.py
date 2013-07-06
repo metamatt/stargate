@@ -26,10 +26,8 @@ class SgReporter(object):
 		# register for shutdown events
 		sg_signal.add_exit_listener(self.atexit)
 
-		# register for unhandled exceptions
-		# TODO: first we need a mechanism for this, which is sadly nontrivla
-		# http://bugs.python.org/issue1230540
-		# http://www.bbarrows.com/Python/Logging/BitTorrent/Code/2012/09/24/implementing-exception-logging-in-python.html
+		# register for logger.exception
+		# TODO...
 
 		# install timers for interval summaries
 		# TODO...
