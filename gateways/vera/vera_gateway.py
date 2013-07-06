@@ -16,7 +16,6 @@
 
 import json
 import logging
-import threading
 import urllib
 
 from sg_util import AttrDict
@@ -150,10 +149,7 @@ class VeraGateway(sg_house.StargateGateway):
 				logger.warning('Exception in vera poll: ' + str(ex))
 			# and reinstall this one-shot timer
 			self._install_periodic_poller()
-		self._poll_thread = threading.Timer(self.poll_interval, poll_callback)
-		self._poll_thread.setDaemon(True)
-		self._poll_thread.setName('vera_poll_timer')
-		self._poll_thread.start()
+		self.house.timer.add_event(self.poll_interval, poll_callback)
 
 	# private interface for owned objects to talk to vera gateway
 	def _luup_get_variable(self, service_id, device_num, variable_name):
