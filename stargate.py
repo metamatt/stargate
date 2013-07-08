@@ -8,6 +8,7 @@ import logging
 import optparse
 import os
 import sys
+import threading
 import yaml
 
 import webif.demo as webapp
@@ -95,6 +96,7 @@ if __name__ == '__main__':
 	# reloadable children, and if so, avoid any heavy lifting.
 	if config.server.webdebug and not os.environ.get('WERKZEUG_RUN_MAIN'):
 		logger.warning('startup: pid %d is the werkzeug reloader' % os.getpid())
+		threading.current_thread().name = 'WerkzeugReloader'
 		house = None
 		os.chdir(orig_cwd)
 	else:
