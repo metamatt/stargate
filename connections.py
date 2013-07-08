@@ -9,8 +9,7 @@ import logging
 import os
 import select
 import socket
-
-import sg_threading
+import threading
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ class CrlfSocketBuffer(object):
 		return lines
 
 
-class ListenerThread(sg_threading.Thread):
+class ListenerThread(threading.Thread):
 	def __init__(self, delegate, name_prefix):
 		super(ListenerThread, self).__init__(name = name_prefix + '_listener')
 		self.delegate = delegate
@@ -59,7 +58,7 @@ class ListenerThread(sg_threading.Thread):
 			sock.close()
 
 
-class SenderThread(sg_threading.Thread):
+class SenderThread(threading.Thread):
 	def __init__(self, delegate, name_prefix):
 		super(SenderThread, self).__init__(name = name_prefix + '_sender')
 		self.delegate = delegate
@@ -84,7 +83,7 @@ class SenderThread(sg_threading.Thread):
 			sock.close()
 
 
-class CleanupAndRestart(sg_threading.Thread):
+class CleanupAndRestart(threading.Thread):
 	def __init__(self, handler):
 		super(CleanupAndRestart, self).__init__(name = 'conn_reconnect')
 		self.daemon = True
@@ -105,12 +104,12 @@ class CleanupAndRestart(sg_threading.Thread):
 		logger.warn('reconnect complete')
 
 
-class SgWatchdog(sg_threading.Thread):
+class SgWatchdog(threading.Thread):
 	def __init__(self):
 		super(SgWatchdog, self).__init__(name = 'conn_watcher')
 		self.daemon = True
 		self.watches = {}
-		self.lock = sg_threading.RLock()
+		self.lock = threading.RLock()
 		(self.read_wake, self.write_wake) = os.pipe() # Use pipe as select-able event object
 
 	def add(self, threads, socket, reconnect):

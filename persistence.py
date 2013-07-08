@@ -27,10 +27,10 @@ import dateutil.parser
 import logging
 import sqlite3
 import sys
+import threading
 import time
 
 import sg_signal
-import sg_threading
 from sg_util import AttrDict
 
 
@@ -61,7 +61,7 @@ class SgPersistence(object):
 		self._cursor = self._conn.cursor()
 		self._version = 1
 		self._init_schema()
-		self._lock = sg_threading.RLock()
+		self._lock = threading.RLock()
 		self._checkpoint_interval = float(dbconfig.checkpoint_interval)
 		if self._checkpoint_interval > 0:
 			self._install_periodic_checkpointer()

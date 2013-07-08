@@ -5,9 +5,8 @@
 # This module provides time-based notifications.
 
 import logging
+import threading
 import time
-
-import sg_threading
 
 
 logger = logging.getLogger(__name__)
@@ -28,8 +27,8 @@ class SgTimer(object):
 
 	def __init__(self):
 		self.timers = [] # List of TimerEvent objects outstanding
-		self.timer_lock = sg_threading.RLock()
-		self.timers_changed = sg_threading.Event()
+		self.timer_lock = threading.RLock()
+		self.timers_changed = threading.Event()
 		self.run_thread()
 
 	# public interface
@@ -55,7 +54,7 @@ class SgTimer(object):
 
 	# worker thread
 	def run_thread(self):
-		class TimerDispatcher(sg_threading.Thread):
+		class TimerDispatcher(threading.Thread):
 			def __init__(self, timer):
 				super(TimerDispatcher, self).__init__(name = 'time_dispatch')
 				self.daemon = True

@@ -22,7 +22,7 @@ logger.info('%s: init with level %s' % (logger.name, logging.getLevelName(logger
 
 
 # signals are process-global, so, so is the state kept by this module.
-# No objects, just modue scope.
+# No objects, just module scope.
 
 exit_listeners = []
 hup_listeners = []
@@ -71,10 +71,28 @@ def init():
 				_call_listeners(exception_listeners)
 	rootLogger.addHandler(ExceptionForwardingHandler())
 
+	# Monkey-patch threading.Thread.start to inject our run wrapper
+	# The goal is to send unhandled exceptions to sys.excepthook, instead of
+	# printing them to stderr like threading.Thread.__bootstrap_inner would do.
+	# The function we want to wrap is 'run', but subclasses override that, so
+	# instead we wrap 'start' (which subclasses normally do not override) to
+	# inject our 'run' wrapper on each individual subclass instance.
+	real_thread_start = threading.Thread.start
+	def start_wrapper(self, *args, **kwargs):
+		self_run = self.run
+		def run_and_catch(*args, **kwargs):
+			try:
+				self_run(*args, **kwargs)
+			except:
+				sys.excepthook(*sys.exc_info())
+		self.run = run_and_catch
+		real_thread_start(self, *args, **kwargs)
+	threading.Thread.start = start_wrapper
+
 	# Install global exception handler. We don't let client code hook this itself,
 	# but we forward exceptions to logger.exception which we do let clients hook.
 	# (Note that this would apply only to MainThread with naive use of threading.Thread,
-	# but sg_threading.Thread makes sure it gets called in child threads too.)
+	# but ExceptionSmartThread makes sure it gets called in child threads too.)
 	def excepthook(type, value, traceback):
 		name = threading.current_thread().name
 		logger.exception('Exception in thread %s' % name)
