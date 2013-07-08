@@ -10,6 +10,7 @@ import os
 import select
 import socket
 import threading
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -97,10 +98,27 @@ class CleanupAndRestart(threading.Thread):
 				logger.debug('sending SenderThread null request to force wakeup')
 				t.delegate.send_queue.put('')
 			t.join()
-		logger.warn('threads exited; invoking reconnect handler')
-		# XXX I haven't tested what happens if reconnect tries to connect too early, say to
-		# a hardware device that disconnected because it rebooted and isn't back up yet.
-		self.reconnect()
+		logger.warn('threads exited; ready to reconnect')
+
+		# Attempt reconnect, but wait a little bit to allow gateway device to recover
+		# from whatever condition caused it to disconnect, and if this fails, keep trying
+		# but apply truncated exponential backoff.
+		delay = 2          # initial delay, in seconds
+		max_delay = 120    # in seconds
+		backoff_factor = 2 # ratio to expand delay time
+		while True:
+			try:
+				logger.warn('waiting %d seconds before attempting reconnect' % delay)
+				time.sleep(delay)
+				logger.warn('invoking reconnect handler')
+				self.reconnect()
+				break
+			except:
+				logger.exception('failure in gateway device reconnect attempt')
+				delay = delay * backoff_factor
+				if delay > max_delay:
+					delay = max_delay
+
 		logger.warn('reconnect complete')
 
 
