@@ -179,37 +179,38 @@ class DscPanelServer(object):
 		assert int(data) > 0 # XXX temporary
 		# XXX should have a concept of gateway online/offline/error
 		
-	def _do_zone_open(self, data):
-		zone = int(data)
+	def _do_zone_open(self, data): # handler for 609
+		zone = int(data) # 3 data bytes: 3-digit zone number
 		logger.info('zone %d: open' % zone)
 		self.cache._record_zone_status(zone, 1)
 
-	def _do_zone_closed(self, data):
-		zone = int(data)
+	def _do_zone_closed(self, data): # handler for 610
+		zone = int(data) # 3 data bytes: 3-digit zone number
 		logger.info('zone %d: closed' % zone)
 		self.cache._record_zone_status(zone, 0)
 
-	def _do_partition_ready(self, data):
-		partition = int(data)
+	def _do_partition_ready(self, data): # handler for 650
+		partition = int(data) # 1 data byte: partition number
 		logger.info('partition %d: ready' % partition)
 		self.cache._record_partition_status(partition, PartitionStatus.READY)
 
-	def _do_partition_armed(self, data):
-		partition = int(data)
-		logger.info('partition %d: closed (armed)' % partition)
+	def _do_partition_armed(self, data): # handler for 652
+		partition = int(data[0]) # 2 data bytes: partion number
+		mode = int(data[1])      # followed by arming mode code
+		logger.info('partition %d: closed (armed) mode %d' % (partition, mode))
 		self.cache._record_partition_status(partition, PartitionStatus.ARMED)
 
-	def _do_partition_busy(self, data):
-		partition = int(data)
+	def _do_partition_busy(self, data): # handler for 673
+		partition = int(data) # 1 data byte: partition number
 		logger.info('partition %d: busy' % partition)
 		self.cache._record_partition_status(partition, PartitionStatus.BUSY)
 
-	def _do_partition_trouble_on(self, data):
-		partition = int(data)
+	def _do_partition_trouble_on(self, data): # handler for 840
+		partition = int(data) # 1 data byte: partition number
 		logger.info('partition %d: TROUBLE' % partition)
 
-	def _do_partition_trouble_off(self, data):
-		partition = int(data)
+	def _do_partition_trouble_off(self, data): # handler for 841
+		partition = int(data) # 1 data byte: partition number
 		logger.info('partition %d: no trouble' % partition)
 
 	def _do_user_command_invoked(self, data):
