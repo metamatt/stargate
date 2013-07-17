@@ -30,7 +30,7 @@ class OutputCache(object):
 		self.output_levels = {} # map from output iid to level
 		self.button_states = {} # map from device iid to map from button component id to state
 		self.led_states = {} # map from device iid to map from led component id to state
-		self.refreshing = set() # set of iids for which we have a refresh in progress
+		self.refresh_count = dict() # map of iids for which we have a refresh in progress, to number of refreshes
 		self.subscribers = [] # list of objects on which we will call on_user_action()
 
 	def watch_output(self, output_iid):
@@ -128,14 +128,18 @@ class OutputCache(object):
 		# arrives, it came from us and not a user action -- so don't broadcast an
 		# on_update message
 		logger.debug('mark_for_refresh: setting ignore flag for iid %d' % iid)
-		self.refreshing.add(iid)
-		
+		self.refresh_count[iid] = self.refresh_count.get(iid, 0) + 1;
+
 	def _broadcast_change(self, iid, state, comp_id = 0):
-		try: # if we had a refresh in progress, unmark it and don't send an update
-			self.refreshing.remove(iid)
-			logger.debug('broadcast_change: removed ignore flag for iid %d' % iid)
+		if iid in self.refresh_count:
+			# if we had a refresh in progress, don't send an update, but decrement
+			# the count of refreshes in progress
 			refresh = True
-		except KeyError: # the normal case, where a refresh is not in progress
+			self.refresh_count[iid] = self.refresh_count[iid] - 1;
+			if self.refresh_count[iid] == 0:
+				del self.refresh_count[iid]
+				logger.debug('broadcast_change: removed ignore flag for iid %d' % iid)
+		else: # the normal case, where a refresh is not in progress
 			refresh = False
 		logger.debug('broadcast_change: sending on_user_action(iid=%d, refresh=%s)' % (iid, str(refresh)))
 		for subscriber in self.subscribers:
