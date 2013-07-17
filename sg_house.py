@@ -253,8 +253,9 @@ class StargateHouse(StargateArea):
 		self.notify = notify.SgNotify(config.notifications)         # SgNotify instance
 		self.persist = persistence.SgPersistence(config.database,   # SgPersistence instance
 			                                     self.events, self.timer)
-		self.reports = reports.SgReporter(config.reporting,         # SgReporter instance
-			                              self.timer, self.notify)
+		if config.get('reporting'):
+			self.reports = reports.SgReporter(config.reporting,     # SgReporter instance
+				                              self.timer, self.notify)
 		self.watchdog = connections.SgWatchdog()                    # SgWatchdog instance
 		self.areas_by_name = {}										# Map from area name to area object
 		self.devices_by_id = {}										# Map from device id to device object
