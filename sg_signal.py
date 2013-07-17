@@ -93,9 +93,9 @@ def init():
 	# but we forward exceptions to logger.exception which we do let clients hook.
 	# (Note that this would apply only to MainThread with naive use of threading.Thread,
 	# but ExceptionSmartThread makes sure it gets called in child threads too.)
-	def excepthook(type, value, traceback):
+	def excepthook(type, value, trace):
 		name = threading.current_thread().name
-		logger.exception('Exception in thread %s' % name)
+		logger.error('Exception in thread %s' % name, exc_info = (type, value, trace))
 	sys.excepthook = excepthook
 
 
