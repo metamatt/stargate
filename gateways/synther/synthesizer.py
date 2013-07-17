@@ -35,8 +35,8 @@ class Bridge(object):
 
 		# Watch when Lutron says to change it (Lutron button/remote/integration)
 		def on_lutron_push(synthetic):
-			logger.debug('lutron dev %d changed to %s %s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
-			if ra_dev.is_on() != dsc_zone.is_open():
+			logger.debug('lutron dev %d changed to %s%s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
+			if not synthetic and ra_dev.is_on() != dsc_zone.is_open():
 				logger.debug('telling dsc to toggle p%dd%d' % (dsc_partition, dsc_cmd_id))
 				dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
 			else:
@@ -45,8 +45,9 @@ class Bridge(object):
 
 		# Watch when DSC says it did change (someone used an old-school switch)
 		def on_physical_push(synthetic):
-			logger.debug('synther.bridge: dsc dev %d changed to %s' % (dsc_zone.zone_number, dsc_zone.is_open()))
-			ra_dev.be_on(dsc_zone.is_open())
+			logger.debug('synther.bridge: dsc dev %d changed to %s%s' % (dsc_zone.zone_number, dsc_zone.is_open(), ' synthetic' if synthetic else ''))
+			if not synthetic:
+				ra_dev.be_on(dsc_zone.is_open())
 		house.events.subscribe(dsc_zone, on_physical_push)
 
 
