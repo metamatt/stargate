@@ -7,6 +7,7 @@
 
 import logging
 import sg_signal
+import threading
 import traceback
 
 
@@ -36,7 +37,8 @@ class SgReporter(object):
 		# TODO...
 
 	def on_exception(self):
-		report = traceback.format_exc();
+		report = 'Exception in thread %s\n\n' % threading.current_thread().name
+		report += traceback.format_exc();
 		self.sg_notify.notify(self.config.exception, report, 'Stargate exception report')
 
 	def on_exit(self):
