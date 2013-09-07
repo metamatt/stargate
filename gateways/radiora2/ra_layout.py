@@ -109,6 +109,8 @@ class Device(LayoutBase):
 				        24: 'Left column lower', 25: 'Left column raise' }
 			elif devtype == 'SEETOUCH_KEYPAD' or devtype == 'HYBRID_SEETOUCH_KEYPAD': # 1 column, 0-2 sets of raise/lower buttons
 				map = { 16: 'Top lower', 17: 'Top raise', 18: 'Bottom lower', 19: 'Bottom raise' }
+			elif devtype == 'VISOR_CONTROL_RECEIVER':
+				map = { 30: 'Full/Security', 31: 'Security Flash', 32: 'Input 1', 33: 'Input 2' }
 			if map is not None and map.has_key(comp):
 				return '[%s]' % map[comp]
 			return None
@@ -131,6 +133,10 @@ class Device(LayoutBase):
 				device.buttons[comp_number] = label
 			elif comp_type == 'LED':
 				device.leds.append(comp_number)
+			elif comp_type == 'CCI':
+				cci_element = component_element.getElementsByTagName('CCI')[0]
+				label = get_fixed_button_name(device_type, comp_number)
+				device.buttons[comp_number] = label
 		return device
 		
 	def ignore(self):

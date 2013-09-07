@@ -239,12 +239,20 @@ class KeypadDevice(ControlDevice):
 
 
 class RemoteKeypadDevice(KeypadDevice):
+	# For now, we'll give this its own devtype, but treat it just like a keypad
 	devtype = 'remote'
 
 
 class RepeaterKeypadDevice(KeypadDevice):
+	# For now, we'll give this its own devtype, but treat it just like a keypad
 	devtype = 'repeater'
 
+
+class VisorReceiverKeypadDevice(KeypadDevice):
+	# VCRX receiver is like a normal 6-button keypad, plus it has CCOs which show
+	# up separately in the DbXmlInfo.xml, plus it has 4 CCIs that look like buttons
+	# numbered 30 through 33, which we also should have found in the manifest.
+	devtype = 'visor_receiver'
 
 class MotionSensorDevice(ControlDevice):
 	devtype = 'occ-sensor'
@@ -299,7 +307,7 @@ def create_device_for_control(ra_area, device_spec):
 		"SEETOUCH_TABLETOP_KEYPAD": KeypadDevice,
 		"HYBRID_SEETOUCH_KEYPAD": KeypadDevice,
 		"PICO_KEYPAD": RemoteKeypadDevice,
-		"VISOR_CONTROL_RECEIVER": RepeaterKeypadDevice,
+		"VISOR_CONTROL_RECEIVER": VisorReceiverKeypadDevice,
 		"MAIN_REPEATER": RepeaterKeypadDevice,
 		"MOTION_SENSOR": MotionSensorDevice,
 	}
