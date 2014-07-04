@@ -13,6 +13,7 @@
 import logging
 
 import sg_house
+import sg_util
 from dsc_panel import DscPanelServer, PartitionStatus
 from dsc_reflector import Reflector
 
@@ -68,8 +69,6 @@ class DscPartition(sg_house.StargateDevice):
 
 class DscZoneSensor(sg_house.StargateDevice):
 	devclass = 'sensor'
-	devtype = 'closure'
-	possible_states = ( 'closed', 'open' )
 
 	def __init__(self, gateway, area, zone_number, name):
 		super(DscZoneSensor, self).__init__(gateway.house, area, gateway, 'zone:%d' % zone_number, name)
@@ -78,7 +77,18 @@ class DscZoneSensor(sg_house.StargateDevice):
 
 	def get_level(self):
 		return self.gateway.get_zone_status(self.zone_number)
-		
+
+	def on_user_action(self, level, synthetic):
+		self.house.events.on_device_state_change(self, synthetic) # state
+
+
+class DscClosureSensor(DscZoneSensor):
+	devtype = 'closure'
+	possible_states = ( 'closed', 'open' )
+
+	def __init__(self, gateway, area, zone_number, name):
+		super(DscClosureSensor, self).__init__(gateway, area, zone_number, name);
+
 	def get_name_for_level(self, level):
 		return 'open' if level else 'closed'
 
@@ -88,8 +98,42 @@ class DscZoneSensor(sg_house.StargateDevice):
 	def is_closed(self):
 		return not self.is_open()
 
-	def on_user_action(self, level, synthetic):
-		self.house.events.on_device_state_change(self, synthetic) # state
+
+class DscMotionSensor(DscZoneSensor):
+	devtype = 'motion'
+	possible_states = ( 'occupied', 'vacant' )
+
+	def __init__(self, gateway, area, zone_number, name):
+		super(DscMotionSensor, self).__init__(gateway, area, zone_number, name);
+
+	def get_name_for_level(self, level):
+		return 'occupied' if level else 'vacant'
+
+	def is_occupied(self):
+		return self.get_level() == 1
+		
+	def is_vacant(self):
+		return not self.is_occupied()
+
+
+def create_device_for_zone(gateway, area, zone_number, zoneInfo):
+	# Static factory for correct DscZoneSensor subclass matching zoneInfo.
+	map_dsc_output_to_class = {
+		'closure': DscClosureSensor,
+		'motion': DscMotionSensor,
+	}
+
+	# treat string as shorthand for a closure sensor
+	if type(zoneInfo) is str:
+		zoneInfo = sg_util.AttrDict({ 'type': 'closure', 'name': zoneInfo })
+	
+	try:
+		cls = map_dsc_output_to_class[zoneInfo.type]
+	except: # XXX fall back on default/generic case
+		logger.error('unknown dsc device type: %s' % zoneInfo.type)
+		cls = DscClosureSensor
+
+	return cls(gateway, area, zone_number, zoneInfo.name)
 
 
 class DscGateway(sg_house.StargateGateway):
@@ -107,11 +151,11 @@ class DscGateway(sg_house.StargateGateway):
 				areas_by_zone[zone_num] = sg_area
 		# zones
 		self.zones_by_id = {}
-		for zone_num in config.zone_names:
+		for zone_num in config.zones:
 			if zone_num not in areas_by_zone:
 				logger.warn('DSC zone %d not mapped to any area; using "unknown" as default' % zone_num)
 				areas_by_zone[zone_num] = house.get_area_by_name('(Unknown)')
-			self.zones_by_id[zone_num] = DscZoneSensor(self, areas_by_zone[zone_num], zone_num, config.zone_names[zone_num])
+			self.zones_by_id[zone_num] = create_device_for_zone(self, areas_by_zone[zone_num], zone_num, config.zones[zone_num])
 		# partitions
 		self.partitions_by_id = {}
 		for partition_num in config.partition_names:

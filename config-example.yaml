@@ -184,14 +184,16 @@ gateways:
             # 0 means disable the reflector; the envisalink port is 4025, so that
             # makes a good choice if you want to enable it.
             reflector_port: 0
-        # zone_names: map from zome number (1 to 64, depending on which powerseries
-        # model you have) to zone name. Only zones mentioned here will be visible
-        # to stargate.
-        zone_names:
+        # zones: map from zome number (1 to 64, depending on which powerseries
+        # model you have) to zone description. Only zones mentioned here will be
+        # visible to stargate. Zone descriptions can be a full { type, name }
+        # description, or just the name as a shorthand for a closure sensor.
+        # Currently supported zone types are "closure" and "motion".
+        zones:
             # Contents here are entirely up to you, for example:
             1: A door
-            2: A window
-            3: A motion sensor
+            2: { type: closure, name: A window }
+            3: { type: motion, name: A motion sensor }
             # and so on.
         # partition_names: map from partition number (1 to 8) to partition name.
         # Only partitions mentioned here will be visible to stargate.
