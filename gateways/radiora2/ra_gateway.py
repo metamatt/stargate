@@ -285,6 +285,7 @@ def create_device_for_output(ra_area, output_spec):
 	# Static factory for correct OutputDevice subclass matching Lutron OutputType.
 	map_lutron_output_to_class = {
 		"INC": DimmedOutput,
+		"AUTO_DETECT": DimmedOutput, # these just started showing up for newer dimmers; I don't know how to "detect" what else it could mean
 		"NON_DIM": SwitchedOutput,
 		"SYSTEM_SHADE": ShadeOutput,
 		"CCO_PULSED": ContactClosureOutput,
@@ -294,7 +295,7 @@ def create_device_for_output(ra_area, output_spec):
 	try:
 		cls = map_lutron_output_to_class[output_spec.get_type()]
 	except: # XXX fall back on default/generic case
-		logger.error('unknown lutron device type: %s' % device_spec.get_type())
+		logger.error('unknown lutron device type: %s' % output_spec.get_type())
 		cls = OutputDevice
 
 	return cls(ra_area, output_spec)
