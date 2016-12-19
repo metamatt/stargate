@@ -239,7 +239,7 @@ class RaRepeater(object):
 		logger.debug('match %s -> monitoring mode now %s,%s' % (match.group(), match.group(1), match.group(2)))
 
 	def _prep_response_handlers(self):
-		self.prompt_re = re.compile('^\s*GNET>\s*(.*)$')
+		self.prompt_re = re.compile('^\s*(GNET> )+(.*)$')
 		self.response_handler_list = [
 			(re.compile('~OUTPUT,(\d+),1,(\d+.\d+)'), self._match_output_response),
 			(re.compile('~DEVICE,(\d+),(\d+),9,(\d)'), self._match_led_response), # XXX: depend on order, since button regex will match led action too
@@ -264,7 +264,7 @@ class RaRepeater(object):
 		# the rest of the line.
 		match = self.prompt_re.match(line)
 		if match:
-			line = match.group(1)
+			line = match.group(2)
 
 		if len(line) > 0:
 			# Try to parse remainder as monitoring response
