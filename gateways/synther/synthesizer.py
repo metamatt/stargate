@@ -8,6 +8,7 @@
 
 import logging
 import time
+import traceback
 
 from sg_util import AttrDict
 import sg_house
@@ -30,17 +31,18 @@ class Bridge(object):
 		(dsc_partition, dsc_cmd_id) = map(int, str(params['dsc_cmd'])) # split out the digits
 
 		# Suck initial state from DSC and push into Lutron
-		logger.debug('Currently: Lutron says %s; DSC says %s' % (ra_dev.is_on(), dsc_zone.is_open()))
+		logger.debug('synther.bridge: Currently: Lutron says %s; DSC says %s' % (ra_dev.is_on(), dsc_zone.is_open()))
 		ra_dev.be_on(dsc_zone.is_open())
 
 		# Watch when Lutron says to change it (Lutron button/remote/integration)
 		def on_lutron_push(synthetic):
-			logger.debug('lutron dev %d changed to %s%s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
+			traceback.print_stack()
+			logger.debug('synther.bridge: lutron dev %d changed to %s%s' % (ra_dev.iid, ra_dev.is_on(), ' synthetic' if synthetic else ''))
 			if not synthetic and ra_dev.is_on() != dsc_zone.is_open():
-				logger.debug('telling dsc to toggle p%dd%d' % (dsc_partition, dsc_cmd_id))
+				logger.debug('synther.bridge: telling dsc to toggle p%dd%d' % (dsc_partition, dsc_cmd_id))
 				dsc_zone.gateway.send_user_command(dsc_partition, dsc_cmd_id)
 			else:
-				logger.debug('ignoring lutron dev-change for %d to already-current state %s' % (ra_dev.iid, ra_dev.is_on()))
+				logger.debug('synther.bridge: ignoring lutron dev-change for %d to already-current state %s' % (ra_dev.iid, ra_dev.is_on()))
 		house.events.subscribe(ra_dev, on_lutron_push)
 
 		# Watch when DSC says it did change (someone used an old-school switch)
