@@ -90,6 +90,16 @@ server:
     webdebug: false
 
 ###################################
+# health reporting configuration (listens on separate port which you can forward
+# safely to the public internet)
+###################################
+healthcheck:
+    # port number, listen if set, disabled by default / if unset
+    # port: 5001
+    # response, default 'ok'
+    response: 'ok'
+
+###################################
 # House and area configuration
 # (gateway plugins can map to these or add their own)
 #####################################################

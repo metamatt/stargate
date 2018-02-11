@@ -12,6 +12,7 @@ import threading
 import yaml
 
 import webif.demo as webapp
+import healthcheck
 from sg_house import StargateHouse
 import sg_signal
 from sg_util import AttrDict
@@ -102,6 +103,10 @@ if __name__ == '__main__':
 	else:
 		logger.warning('startup: pid %d is the active werkzeug' % os.getpid())
 		house = StargateHouse(config)
+
+	# start healthcheck, if configured
+	if config.healthcheck.port:
+		healthcheck.start(**config.healthcheck)
 
 	# run the web app
 	webapp.start(house, **config.server)
