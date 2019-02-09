@@ -285,6 +285,7 @@ def create_device_for_output(ra_area, output_spec):
 	# Static factory for correct OutputDevice subclass matching Lutron OutputType.
 	map_lutron_output_to_class = {
 		"INC": DimmedOutput,
+		"MLV": DimmedOutput,
 		"AUTO_DETECT": DimmedOutput, # these just started showing up for newer dimmers; I don't know how to "detect" what else it could mean
 		"NON_DIM": SwitchedOutput,
 		"SYSTEM_SHADE": ShadeOutput,
