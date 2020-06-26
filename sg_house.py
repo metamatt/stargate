@@ -291,6 +291,7 @@ class StargateHouse(StargateArea):
 	def _register_device(self, device):
 		did = self.persist.get_device_id(device.gateway.gateway_id, device.gateway_devid)
 		self.devices_by_id[did] = device
+		logger.info('register dev name %s id %d (gw %s:%s)' % (device.name, did, device.gateway.gateway_id, device.gateway_devid))
 		self._add_devtype_for_ordering(device.devclass, device.devtype)
 		self._add_devstates_for_ordering(device.devclass, device.devtype, device.possible_states)
 		return did
