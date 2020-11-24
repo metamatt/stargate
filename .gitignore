@@ -1,2 +1,4 @@
 *.pyc
+*~
 DbXmlInfo.xml
+config.yaml
