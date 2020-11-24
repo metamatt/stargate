@@ -9,7 +9,7 @@ Stargate is a web interface to various home automation gateways including
 * Lutron's RadioRa2 lighting/windowshade/HVAC home control system
   (Lutron's more capable Homeworks system has a similar network API and would
   probably mostly work with this code too, but it hasn't been tested.)
-* DSC PowerSeries security system (via Eyez-On Envisalink ehternet integration
+* DSC PowerSeries security system (via Eyez-On Envisalink ethernet integration
   interface)
 * MiCasaVerde Vera home controller and Z-Wave gateway
 
