@@ -10,3 +10,12 @@ curl http://lutron-radiora/DbXmlInfo.xml > lutron-DbXmlInfo.xml
 # the input), but anything on stderr means you should be wary.
 
 xmllint lutron-DbXmlInfo.xml > /dev/null
+if [ $? -ne 0 ]
+then
+  echo "Suspicious XML retrieved; please investigate"
+  exit 1
+fi
+
+# Reformat the XML file for legibility
+xmllint --format lutron-DbXmlInfo.xml > lutron-DbXmlInfo.pretty.xml
+mv lutron-DbXmlInfo.pretty.xml lutron-DbXmlInfo.xml
