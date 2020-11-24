@@ -286,6 +286,7 @@ def create_device_for_output(ra_area, output_spec):
 	map_lutron_output_to_class = {
 		"INC": DimmedOutput,
 		"MLV": DimmedOutput,
+		"ZERO_TO_TEN": DimmedOutput,
 		"AUTO_DETECT": DimmedOutput, # these just started showing up for newer dimmers; I don't know how to "detect" what else it could mean
 		"NON_DIM": SwitchedOutput,
 		"SYSTEM_SHADE": ShadeOutput,
@@ -308,6 +309,8 @@ def create_device_for_control(ra_area, device_spec):
 		"SEETOUCH_KEYPAD": KeypadDevice,
 		"SEETOUCH_TABLETOP_KEYPAD": KeypadDevice,
 		"HYBRID_SEETOUCH_KEYPAD": KeypadDevice,
+		"GRAFIK_T_KEYPAD": KeypadDevice,
+		"GRAFIK_T_HYBRID_KEYPAD": KeypadDevice,
 		"PICO_KEYPAD": RemoteKeypadDevice,
 		"VISOR_CONTROL_RECEIVER": VisorReceiverKeypadDevice,
 		"MAIN_REPEATER": RepeaterKeypadDevice,
